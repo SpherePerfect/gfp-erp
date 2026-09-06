@@ -1,0 +1,6 @@
+{
+  "name": "GFP Engagement Letter & Pro-Forma Invoice Generator",
+  "description": "Professional tool for GFP Advisory & Consulting Services featuring an enterprise 34-column Marketing CRM/ERP, automated TAT and commercial tracking, and exportable Engagement Letters and Pro-Forma Invoices in Word (.docx) format.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
