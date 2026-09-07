@@ -1,4 +1,5 @@
 import { TrashItem } from '../types';
+import { saveTrashDoc, deleteTrashDoc } from './firestoreSync';
 
 const TRASH_STORAGE_KEY = 'ca_erp_dustbin_items_v1';
 
@@ -60,6 +61,7 @@ export function addToTrash(
   const existing = getStoredTrashItems();
   const updated = [trashItem, ...existing];
   saveTrashItems(updated);
+  saveTrashDoc(trashItem).catch((err) => console.warn('Firestore trash save error:', err));
   return trashItem;
 }
 
@@ -69,10 +71,15 @@ export function removeFromTrash(trashId: string): TrashItem | null {
   if (item) {
     const updated = existing.filter((i) => i.id !== trashId);
     saveTrashItems(updated);
+    deleteTrashDoc(trashId).catch((err) => console.warn('Firestore trash delete error:', err));
   }
   return item;
 }
 
 export function clearAllTrash(): void {
+  const existing = getStoredTrashItems();
+  existing.forEach((item) => {
+    deleteTrashDoc(item.id).catch((err) => console.warn('Firestore trash clear error:', err));
+  });
   saveTrashItems([]);
 }

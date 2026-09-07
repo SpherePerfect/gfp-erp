@@ -48,6 +48,7 @@ import {
   saveLceRecordDoc,
   deleteLceRecordDoc,
   saveTemplateDoc,
+  deleteTemplateDoc,
   saveFirmProfileDoc,
 } from './utils/firestoreSync';
 import {
@@ -123,8 +124,7 @@ export default function App() {
   };
 
   // Real-time Firestore Listeners:
-  // Firm Profile, Taxonomy, and Templates sync immediately
-  // Authenticated collections (Engagements, CRM, LCE, Users, Trash) attach when user is signed in
+  // Active continuously across all sessions and browsers for instant real-time live sync
   useEffect(() => {
     const unsubFirm = subscribeToFirmProfile((firm) => {
       if (firm) {
@@ -139,21 +139,13 @@ export default function App() {
     });
 
     const unsubTmpl = subscribeToTemplates((tmpls) => {
-      if (tmpls && tmpls.length > 0) {
+      if (Array.isArray(tmpls)) {
         setTemplates(tmpls);
       }
     }, defaultTemplates);
 
-    if (!firebaseUser) {
-      return () => {
-        unsubFirm();
-        unsubTax();
-        unsubTmpl();
-      };
-    }
-
     const unsubUsers = subscribeToUsers((users) => {
-      if (users && users.length > 0) {
+      if (Array.isArray(users)) {
         setAllUsers(users);
         if (currentUser) {
           const matched = users.find((u) => u.uid === currentUser.uid);
@@ -163,25 +155,25 @@ export default function App() {
     }, [DEFAULT_PRIMARY_ADMIN]);
 
     const unsubEng = subscribeToEngagements((engs) => {
-      if (engs && engs.length > 0) {
+      if (Array.isArray(engs)) {
         setEngagements(engs);
       }
     }, getStoredEngagements());
 
     const unsubCrm = subscribeToCrmRecords((crms) => {
-      if (crms && crms.length > 0) {
+      if (Array.isArray(crms)) {
         setCrmRecords(crms);
       }
     }, getStoredCrmRecords());
 
     const unsubLce = subscribeToLceRecords((lces) => {
-      if (lces && lces.length > 0) {
+      if (Array.isArray(lces)) {
         setLceRecords(lces);
       }
     }, getStoredLceRecords());
 
     const unsubTrash = subscribeToTrash((items) => {
-      if (items) {
+      if (Array.isArray(items)) {
         setTrashCount(items.length);
       }
     });
@@ -196,7 +188,7 @@ export default function App() {
       unsubLce();
       unsubTrash();
     };
-  }, [firebaseUser]);
+  }, []);
 
   // Firebase Auth Listener
   useEffect(() => {
@@ -326,11 +318,19 @@ export default function App() {
     setAllUsers((prev) => prev.filter((u) => u.uid !== uid));
   };
 
-  // Save changes to storage & real-time Firestore
+  // Save changes to storage & real-time Firestore with proactive deletion sync
   const handleSaveEngagementsList = (updated: EngagementRecord[]) => {
+    const updatedIds = new Set(updated.map((e) => e.id));
+    engagements.forEach((prev) => {
+      if (!updatedIds.has(prev.id)) {
+        deleteEngagementDoc(prev.id).catch((err) => console.error('Firestore engagement delete error:', err));
+      }
+    });
+
     setEngagements(updated);
     saveEngagements(updated);
-    // sync to firestore
+
+    // Sync newly added or modified to firestore
     updated.forEach((rec) => {
       saveEngagementDoc(rec).catch((err) => console.error('Firestore engagement sync error:', err));
     });
@@ -342,6 +342,13 @@ export default function App() {
   };
 
   const handleSaveCrmRecordsList = (updated: CrmClientRecord[]) => {
+    const updatedIds = new Set(updated.map((r) => r.id));
+    crmRecords.forEach((prev) => {
+      if (!updatedIds.has(prev.id)) {
+        deleteCrmRecordDoc(prev.id).catch((err) => console.error('Firestore CRM delete error:', err));
+      }
+    });
+
     setCrmRecords(updated);
     saveCrmRecords(updated);
     updated.forEach((rec) => {
@@ -350,6 +357,13 @@ export default function App() {
   };
 
   const handleSaveTemplatesList = (updated: ServiceTemplate[]) => {
+    const updatedIds = new Set(updated.map((t) => t.id));
+    templates.forEach((prev) => {
+      if (!updatedIds.has(prev.id)) {
+        deleteTemplateDoc(prev.id).catch((err) => console.error('Firestore template delete error:', err));
+      }
+    });
+
     setTemplates(updated);
     saveTemplates(updated);
     updated.forEach((tmpl) => {
@@ -358,6 +372,13 @@ export default function App() {
   };
 
   const handleSaveLceRecordsList = (updated: LceRecord[]) => {
+    const updatedIds = new Set(updated.map((l) => l.id));
+    lceRecords.forEach((prev) => {
+      if (!updatedIds.has(prev.id)) {
+        deleteLceRecordDoc(prev.id).catch((err) => console.error('Firestore LCE delete error:', err));
+      }
+    });
+
     setLceRecords(updated);
     saveLceRecords(updated);
     updated.forEach((lce) => {
@@ -608,6 +629,7 @@ export default function App() {
 
     const updated = engagements.filter((e) => e.id !== id);
     handleSaveEngagementsList(updated);
+    deleteEngagementDoc(id).catch((err) => console.error('Direct delete error:', err));
     if (selectedEngagement?.id === id) {
       setSelectedEngagement(null);
       setView('dashboard');

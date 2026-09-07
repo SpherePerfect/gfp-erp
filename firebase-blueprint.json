@@ -125,9 +125,22 @@
         "deletedBy": { "type": "string" }
       },
       "required": ["id", "itemType", "title", "deletedAt"]
+    },
+    "systemMeta": {
+      "title": "System Metadata",
+      "description": "System initialization marker and database state",
+      "type": "object",
+      "properties": {
+        "initializedAt": { "type": "string" },
+        "version": { "type": "string" }
+      }
     }
   },
   "firestore": {
+    "/_system/{docId}": {
+      "schema": "systemMeta",
+      "description": "System initialization and metadata markers"
+    },
     "/users/{userId}": {
       "schema": "user",
       "description": "User profiles with job titles, roles, and avatar image"

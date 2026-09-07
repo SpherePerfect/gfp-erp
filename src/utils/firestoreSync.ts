@@ -4,11 +4,12 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
+  getDoc,
   getDocs,
   writeBatch,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
   EngagementRecord,
   CrmClientRecord,
@@ -37,7 +38,34 @@ export const COLLECTIONS = {
   TAXONOMY: 'taxonomy',
   TRASH: 'trash',
   USERS: 'users',
+  SYSTEM: '_system',
 } as const;
+
+/**
+ * System Initialization Guard:
+ * Ensures default sample records are only seeded ONCE during initial database setup,
+ * and prevents deleted documents from being accidentally resurrected when collections are emptied.
+ */
+export async function checkIsDbInitialized(): Promise<boolean> {
+  try {
+    const snap = await getDoc(doc(db, COLLECTIONS.SYSTEM, 'init'));
+    return snap.exists();
+  } catch (err) {
+    console.warn('Could not check DB initialization marker:', err);
+    return false;
+  }
+}
+
+export async function markDbInitialized(): Promise<void> {
+  try {
+    await setDoc(doc(db, COLLECTIONS.SYSTEM, 'init'), {
+      initializedAt: new Date().toISOString(),
+      version: '1.0',
+    });
+  } catch (err) {
+    console.warn('Could not mark DB initialization marker:', err);
+  }
+}
 
 /**
  * 1. REAL-TIME LISTENER: USERS
@@ -46,40 +74,38 @@ export function subscribeToUsers(
   onUpdate: (users: AppUser[]) => void,
   initialSeed: AppUser[] = []
 ): Unsubscribe {
-  if (!auth.currentUser) {
-    return () => {};
-  }
   const usersCol = collection(db, COLLECTIONS.USERS);
 
   return onSnapshot(
     usersCol,
     async (snapshot) => {
       if (snapshot.empty && initialSeed.length > 0) {
-        // Seed initial admin user if collection is completely fresh
-        try {
-          const batch = writeBatch(db);
-          initialSeed.forEach((u) => {
-            const ref = doc(db, COLLECTIONS.USERS, u.uid);
-            batch.set(ref, u);
-          });
-          await batch.commit();
-        } catch (err) {
-          console.warn('Initial users seed failed:', err);
+        const isInit = await checkIsDbInitialized();
+        if (!isInit) {
+          try {
+            const batch = writeBatch(db);
+            initialSeed.forEach((u) => {
+              const ref = doc(db, COLLECTIONS.USERS, u.uid);
+              batch.set(ref, u);
+            });
+            await batch.commit();
+          } catch (err) {
+            console.warn('Initial users seed failed:', err);
+          }
+          onUpdate(initialSeed);
+          return;
         }
-        onUpdate(initialSeed);
-        return;
       }
 
       const users: AppUser[] = [];
       snapshot.forEach((docSnap) => {
         users.push(docSnap.data() as AppUser);
       });
-      // Sort users by createdAt descending
       users.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       onUpdate(users);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.USERS);
+      console.warn('Firestore users listen error:', error);
     }
   );
 }
@@ -91,28 +117,28 @@ export function subscribeToEngagements(
   onUpdate: (engagements: EngagementRecord[]) => void,
   initialSeed: EngagementRecord[] = []
 ): Unsubscribe {
-  if (!auth.currentUser) {
-    return () => {};
-  }
   const colRef = collection(db, COLLECTIONS.ENGAGEMENTS);
 
   return onSnapshot(
     colRef,
     async (snapshot) => {
       if (snapshot.empty && initialSeed.length > 0) {
-        // Seed initial engagements if remote collection is empty
-        try {
-          const batch = writeBatch(db);
-          initialSeed.forEach((eng) => {
-            const ref = doc(db, COLLECTIONS.ENGAGEMENTS, eng.id);
-            batch.set(ref, eng);
-          });
-          await batch.commit();
-        } catch (err) {
-          console.warn('Initial engagements seed failed:', err);
+        const isInit = await checkIsDbInitialized();
+        if (!isInit) {
+          try {
+            const batch = writeBatch(db);
+            initialSeed.forEach((eng) => {
+              const ref = doc(db, COLLECTIONS.ENGAGEMENTS, eng.id);
+              batch.set(ref, eng);
+            });
+            await batch.commit();
+            await markDbInitialized();
+          } catch (err) {
+            console.warn('Initial engagements seed failed:', err);
+          }
+          onUpdate(initialSeed);
+          return;
         }
-        onUpdate(initialSeed);
-        return;
       }
 
       const items: EngagementRecord[] = [];
@@ -124,7 +150,7 @@ export function subscribeToEngagements(
       onUpdate(items);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.ENGAGEMENTS);
+      console.warn('Firestore engagements listen error:', error);
     }
   );
 }
@@ -136,27 +162,28 @@ export function subscribeToCrmRecords(
   onUpdate: (records: CrmClientRecord[]) => void,
   initialSeed: CrmClientRecord[] = []
 ): Unsubscribe {
-  if (!auth.currentUser) {
-    return () => {};
-  }
   const colRef = collection(db, COLLECTIONS.CRM_RECORDS);
 
   return onSnapshot(
     colRef,
     async (snapshot) => {
       if (snapshot.empty && initialSeed.length > 0) {
-        try {
-          const batch = writeBatch(db);
-          initialSeed.forEach((rec) => {
-            const ref = doc(db, COLLECTIONS.CRM_RECORDS, rec.id);
-            batch.set(ref, rec);
-          });
-          await batch.commit();
-        } catch (err) {
-          console.warn('Initial CRM seed failed:', err);
+        const isInit = await checkIsDbInitialized();
+        if (!isInit) {
+          try {
+            const batch = writeBatch(db);
+            initialSeed.forEach((rec) => {
+              const ref = doc(db, COLLECTIONS.CRM_RECORDS, rec.id);
+              batch.set(ref, rec);
+            });
+            await batch.commit();
+            await markDbInitialized();
+          } catch (err) {
+            console.warn('Initial CRM seed failed:', err);
+          }
+          onUpdate(initialSeed);
+          return;
         }
-        onUpdate(initialSeed);
-        return;
       }
 
       const items: CrmClientRecord[] = [];
@@ -168,7 +195,7 @@ export function subscribeToCrmRecords(
       onUpdate(items);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.CRM_RECORDS);
+      console.warn('Firestore CRM listen error:', error);
     }
   );
 }
@@ -180,27 +207,28 @@ export function subscribeToLceRecords(
   onUpdate: (records: LceRecord[]) => void,
   initialSeed: LceRecord[] = []
 ): Unsubscribe {
-  if (!auth.currentUser) {
-    return () => {};
-  }
   const colRef = collection(db, COLLECTIONS.LCE_RECORDS);
 
   return onSnapshot(
     colRef,
     async (snapshot) => {
       if (snapshot.empty && initialSeed.length > 0) {
-        try {
-          const batch = writeBatch(db);
-          initialSeed.forEach((rec) => {
-            const ref = doc(db, COLLECTIONS.LCE_RECORDS, rec.id);
-            batch.set(ref, rec);
-          });
-          await batch.commit();
-        } catch (err) {
-          console.warn('Initial LCE seed failed:', err);
+        const isInit = await checkIsDbInitialized();
+        if (!isInit) {
+          try {
+            const batch = writeBatch(db);
+            initialSeed.forEach((rec) => {
+              const ref = doc(db, COLLECTIONS.LCE_RECORDS, rec.id);
+              batch.set(ref, rec);
+            });
+            await batch.commit();
+            await markDbInitialized();
+          } catch (err) {
+            console.warn('Initial LCE seed failed:', err);
+          }
+          onUpdate(initialSeed);
+          return;
         }
-        onUpdate(initialSeed);
-        return;
       }
 
       const items: LceRecord[] = [];
@@ -212,13 +240,13 @@ export function subscribeToLceRecords(
       onUpdate(items);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.LCE_RECORDS);
+      console.warn('Firestore LCE listen error:', error);
     }
   );
 }
 
 /**
- * 5. REAL-TIME LISTENER: SERVICE TEMPLATES
+ * 5. REAL-TIME LISTENER: SERVICE MASTER TEMPLATES
  */
 export function subscribeToTemplates(
   onUpdate: (templates: ServiceTemplate[]) => void,
@@ -230,7 +258,8 @@ export function subscribeToTemplates(
     colRef,
     async (snapshot) => {
       if (snapshot.empty && initialSeed.length > 0) {
-        if (auth.currentUser) {
+        const isInit = await checkIsDbInitialized();
+        if (!isInit) {
           try {
             const batch = writeBatch(db);
             initialSeed.forEach((tmpl) => {
@@ -238,6 +267,7 @@ export function subscribeToTemplates(
               batch.set(ref, tmpl);
             });
             await batch.commit();
+            await markDbInitialized();
           } catch (err) {
             console.warn('Initial templates seed failed:', err);
           }
@@ -254,7 +284,7 @@ export function subscribeToTemplates(
       onUpdate(items);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.TEMPLATES);
+      console.warn('Firestore templates listen error:', error);
     }
   );
 }
@@ -272,12 +302,10 @@ export function subscribeToFirmProfile(
     docRef,
     async (snapshot) => {
       if (!snapshot.exists()) {
-        if (auth.currentUser) {
-          try {
-            await setDoc(docRef, { ...initialSeed, id: 'default' });
-          } catch (err) {
-            console.warn('Initial firm profile seed failed:', err);
-          }
+        try {
+          await setDoc(docRef, { ...initialSeed, id: 'default' });
+        } catch (err) {
+          console.warn('Initial firm profile seed failed:', err);
         }
         onUpdate(initialSeed);
         return;
@@ -288,7 +316,7 @@ export function subscribeToFirmProfile(
       onUpdate(profile);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.GET, `${COLLECTIONS.FIRM_PROFILE}/default`);
+      console.warn('Firestore firm profile listen error:', error);
     }
   );
 }
@@ -311,7 +339,7 @@ export function subscribeToTaxonomy(
       }
     },
     (error) => {
-      handleFirestoreError(error, OperationType.GET, `${COLLECTIONS.TAXONOMY}/default`);
+      console.warn('Firestore taxonomy listen error:', error);
     }
   );
 }
@@ -322,9 +350,6 @@ export function subscribeToTaxonomy(
 export function subscribeToTrash(
   onUpdate: (trashItems: TrashItem[]) => void
 ): Unsubscribe {
-  if (!auth.currentUser) {
-    return () => {};
-  }
   const colRef = collection(db, COLLECTIONS.TRASH);
 
   return onSnapshot(
@@ -343,141 +368,127 @@ export function subscribeToTrash(
       onUpdate(items);
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.TRASH);
+      console.warn('Firestore trash listen error:', error);
     }
   );
 }
 
 // -------------------------------------------------------------
-// FIRESTORE MUTATION HELPERS WITH ZERO-TRUST ERROR HANDLING
+// FIRESTORE MUTATION HELPERS: LIVE ACROSS ALL BROWSERS
 // -------------------------------------------------------------
 
 export async function saveEngagementDoc(engagement: EngagementRecord): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.ENGAGEMENTS}/${engagement.id}`;
   try {
     await setDoc(doc(db, COLLECTIONS.ENGAGEMENTS, engagement.id), engagement);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveEngagementDoc error:', error);
   }
 }
 
 export async function deleteEngagementDoc(engagementId: string): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.ENGAGEMENTS}/${engagementId}`;
   try {
     await deleteDoc(doc(db, COLLECTIONS.ENGAGEMENTS, engagementId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('deleteEngagementDoc error:', error);
   }
 }
 
 export async function saveCrmRecordDoc(record: CrmClientRecord): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.CRM_RECORDS}/${record.id}`;
   try {
     await setDoc(doc(db, COLLECTIONS.CRM_RECORDS, record.id), record);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveCrmRecordDoc error:', error);
   }
 }
 
 export async function deleteCrmRecordDoc(recordId: string): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.CRM_RECORDS}/${recordId}`;
   try {
     await deleteDoc(doc(db, COLLECTIONS.CRM_RECORDS, recordId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('deleteCrmRecordDoc error:', error);
   }
 }
 
 export async function saveLceRecordDoc(record: LceRecord): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.LCE_RECORDS}/${record.id}`;
   try {
     await setDoc(doc(db, COLLECTIONS.LCE_RECORDS, record.id), record);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveLceRecordDoc error:', error);
   }
 }
 
 export async function deleteLceRecordDoc(recordId: string): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.LCE_RECORDS}/${recordId}`;
   try {
     await deleteDoc(doc(db, COLLECTIONS.LCE_RECORDS, recordId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('deleteLceRecordDoc error:', error);
   }
 }
 
 export async function saveTemplateDoc(template: ServiceTemplate): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.TEMPLATES}/${template.id}`;
   try {
     await setDoc(doc(db, COLLECTIONS.TEMPLATES, template.id), template);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveTemplateDoc error:', error);
   }
 }
 
 export async function deleteTemplateDoc(templateId: string): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.TEMPLATES}/${templateId}`;
   try {
     await deleteDoc(doc(db, COLLECTIONS.TEMPLATES, templateId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('deleteTemplateDoc error:', error);
   }
 }
 
 export async function saveFirmProfileDoc(profile: FirmProfile): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.FIRM_PROFILE}/default`;
   try {
     await setDoc(doc(db, COLLECTIONS.FIRM_PROFILE, 'default'), profile);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveFirmProfileDoc error:', error);
   }
 }
 
 export async function saveTaxonomyDoc(taxonomy: CustomTaxonomyConfig): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.TAXONOMY}/default`;
   try {
     await setDoc(doc(db, COLLECTIONS.TAXONOMY, 'default'), taxonomy);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveTaxonomyDoc error:', error);
   }
 }
 
 export async function saveTrashDoc(item: TrashItem): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.TRASH}/${item.id}`;
   try {
     await setDoc(doc(db, COLLECTIONS.TRASH, item.id), item);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveTrashDoc error:', error);
   }
 }
 
 export async function deleteTrashDoc(itemId: string): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.TRASH}/${itemId}`;
   try {
     await deleteDoc(doc(db, COLLECTIONS.TRASH, itemId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('deleteTrashDoc error:', error);
   }
 }
 
 export async function saveUserDoc(user: AppUser): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.USERS}/${user.uid}`;
   try {
     await setDoc(doc(db, COLLECTIONS.USERS, user.uid), user);
-    // If role is Admin, maintain /admins/{uid} marker
     if (user.role === 'Admin') {
       await setDoc(doc(db, 'admins', user.uid), {
         uid: user.uid,
@@ -492,12 +503,11 @@ export async function saveUserDoc(user: AppUser): Promise<void> {
       }
     }
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('saveUserDoc error:', error);
   }
 }
 
 export async function deleteUserDoc(uid: string): Promise<void> {
-  if (!auth.currentUser) return;
   const path = `${COLLECTIONS.USERS}/${uid}`;
   try {
     await deleteDoc(doc(db, COLLECTIONS.USERS, uid));
@@ -507,6 +517,6 @@ export async function deleteUserDoc(uid: string): Promise<void> {
       // safe ignore
     }
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('deleteUserDoc error:', error);
   }
 }

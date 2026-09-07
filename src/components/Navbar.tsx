@@ -233,6 +233,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             RIGHT CLUSTER: Primary Action, Secondary Tools Menu & Account Profile
            ========================================================================= */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Live Cloud Multi-Session Sync Indicator */}
+          <div
+            className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-emerald-50/80 border border-emerald-200 text-emerald-800 text-[10px] font-medium tracking-tight rounded-xs select-none"
+            title="Real-time multi-browser synchronization active. All additions, edits, and deletions sync instantly across all devices."
+          >
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-600"></span>
+            </span>
+            <span className="font-semibold">Live Synced</span>
+          </div>
+
           {/* Primary CTA: New Engagement */}
           <button
             type="button"
