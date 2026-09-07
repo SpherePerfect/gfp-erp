@@ -74,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
           <div className="leading-tight hidden sm:block">
-            <span className="font-semibold text-xs sm:text-sm tracking-tight text-slate-900 block group-hover:text-indigo-600 transition-colors truncate max-w-[160px]">
+            <span className="font-semibold text-xs sm:text-sm tracking-tight text-slate-900 block group-hover:text-[#0B2545] transition-colors truncate max-w-[160px]">
               {firmProfile.firmName || 'GFP Advisory'}
             </span>
             <span className="text-[9.5px] text-slate-500 font-medium hidden md:block">
@@ -92,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Click or press ⌘K to open Spotlight Search"
           >
             <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-              <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+              <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#0B2545] transition-colors" />
             </div>
             <input
               id="navbar-spotlight-input"
@@ -109,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onOpenSpotlight();
               }}
               placeholder="Search clients, ref, invoice... (⌘K)"
-              className="w-full pl-8 pr-12 py-1.5 bg-slate-50 hover:bg-slate-100/90 focus:bg-white border border-slate-200 hover:border-indigo-300 focus:border-indigo-500 rounded-none text-xs text-slate-800 placeholder:text-slate-400 transition-all shadow-2xs cursor-pointer focus:outline-none"
+              className="w-full pl-8 pr-12 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 hover:border-slate-300 focus:border-[#0B2545] rounded-none text-xs text-slate-800 placeholder:text-slate-400 transition-all shadow-2xs cursor-pointer focus:outline-none"
             />
             <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1 pointer-events-none">
               <kbd className="px-1 py-0.5 text-[9px] font-mono bg-white border border-slate-200 text-slate-500 shadow-2xs font-semibold">
@@ -133,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Right: Navigation Links & Actions (tightly fitted, zero overflow) */}
+        {/* Right: Navigation Links & Actions (Uniform color scheme & styling) */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap">
           {/* Engagements Dashboard */}
           <button
@@ -141,11 +141,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-none text-xs font-semibold btn-interactive transition-colors ${
               currentView === 'dashboard'
                 ? 'bg-[#0B2545] text-white border border-[#0B2545] shadow-xs'
-                : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent'
+                : 'text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200'
             }`}
             title="Charter Engagements Dashboard"
           >
-            <Briefcase className={`w-3.5 h-3.5 ${currentView === 'dashboard' ? 'text-blue-200' : 'text-[#0B2545]'}`} />
+            <Briefcase className={`w-3.5 h-3.5 ${currentView === 'dashboard' ? 'text-white' : 'text-slate-500 group-hover:text-[#0B2545]'}`} />
             <span className="hidden sm:inline">Engagements</span>
           </button>
 
@@ -155,15 +155,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-none text-xs font-semibold btn-interactive transition-colors ${
               currentView === 'crm'
                 ? 'bg-[#0B2545] text-white border border-[#0B2545] shadow-xs'
-                : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent'
+                : 'text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200'
             }`}
             title="Marketing CRM & Pipeline ERP"
           >
-            <TrendingUp className={`w-3.5 h-3.5 ${currentView === 'crm' ? 'text-blue-200' : 'text-[#0B2545]'}`} />
+            <TrendingUp className={`w-3.5 h-3.5 ${currentView === 'crm' ? 'text-white' : 'text-slate-500 group-hover:text-[#0B2545]'}`} />
             <span>CRM</span>
             {crmCount > 0 && (
               <span className={`px-1.5 py-0.2 text-[9.5px] font-bold font-mono ${
-                currentView === 'crm' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+                currentView === 'crm' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
               }`}>
                 {crmCount}
               </span>
@@ -176,11 +176,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-none text-xs font-semibold btn-interactive transition-colors ${
               currentView === 'commission'
                 ? 'bg-[#0B2545] text-white border border-[#0B2545] shadow-xs'
-                : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent'
+                : 'text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200'
             }`}
             title="Commission Tracker & Multi-Beneficiary Settlement Register"
           >
-            <DollarSign className={`w-3.5 h-3.5 ${currentView === 'commission' ? 'text-blue-200' : 'text-[#0B2545]'}`} />
+            <DollarSign className={`w-3.5 h-3.5 ${currentView === 'commission' ? 'text-white' : 'text-slate-500 group-hover:text-[#0B2545]'}`} />
             <span>Commissions</span>
           </button>
 
@@ -190,11 +190,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-none text-xs font-semibold btn-interactive transition-colors ${
               currentView === 'templates'
                 ? 'bg-[#0B2545] text-white border border-[#0B2545] shadow-xs'
-                : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent'
+                : 'text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200'
             }`}
             title="Service Master Templates"
           >
-            <Layers className={`w-3.5 h-3.5 ${currentView === 'templates' ? 'text-blue-200' : 'text-[#0B2545]'}`} />
+            <Layers className={`w-3.5 h-3.5 ${currentView === 'templates' ? 'text-white' : 'text-slate-500 group-hover:text-[#0B2545]'}`} />
             <span className="hidden md:inline">Templates</span>
           </button>
 
@@ -202,10 +202,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenTaxonomy && (
             <button
               onClick={onOpenTaxonomy}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-none text-xs font-semibold text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent btn-interactive transition-colors"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-none text-xs font-semibold text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200 btn-interactive transition-colors"
               title="Customize CRM Lists, Lead Statuses & Taxonomies"
             >
-              <Sliders className="w-3.5 h-3.5 text-slate-600" />
+              <Sliders className="w-3.5 h-3.5 text-slate-500" />
               <span className="hidden lg:inline">Lists</span>
             </button>
           )}
@@ -214,26 +214,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenTrash && (
             <button
               onClick={onOpenTrash}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-none text-xs font-semibold text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent btn-interactive transition-colors relative"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-none text-xs font-semibold text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200 btn-interactive transition-colors relative"
               title="Dustbin / Recycle Bin (View deleted records accurate to milliseconds)"
             >
-              <Trash2 className="w-3.5 h-3.5 text-slate-600" />
+              <Trash2 className="w-3.5 h-3.5 text-slate-500" />
               <span className="hidden xl:inline">Dustbin</span>
               {trashCount > 0 && (
-                <span className="px-1.5 py-0.2 text-[9px] font-bold font-mono bg-rose-100 text-rose-800 rounded-full border border-rose-200">
+                <span className="px-1.5 py-0.2 text-[9px] font-bold font-mono bg-slate-200 text-slate-700 border border-slate-300">
                   {trashCount}
                 </span>
               )}
             </button>
           )}
 
-          {/* Firm Settings */}
+          {/* Firm Settings (Guides live inside Settings only) */}
           <button
             onClick={onOpenSettings}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-none text-xs font-semibold text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-transparent btn-interactive transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-none text-xs font-semibold text-slate-700 hover:text-[#0B2545] hover:bg-slate-100 border border-transparent hover:border-slate-200 btn-interactive transition-colors"
             title="Firm & Letterhead Settings (including Button & Feature Guide)"
           >
-            <Settings className="w-3.5 h-3.5 text-slate-600" />
+            <Settings className="w-3.5 h-3.5 text-slate-500" />
             <span className="hidden md:inline">Settings</span>
           </button>
 
@@ -243,9 +243,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Create New Engagement Primary Action */}
           <button
             onClick={onNewEngagement}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0B2545] hover:bg-[#133863] text-white rounded-none text-xs font-semibold shadow-xs btn-interactive transition-colors border border-[#0B2545] whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0B2545] hover:bg-[#133863] active:bg-[#0B2545] text-white rounded-none text-xs font-semibold shadow-xs btn-interactive transition-colors border border-[#0B2545] whitespace-nowrap"
           >
-            <Plus className="w-3.5 h-3.5 text-blue-200" />
+            <Plus className="w-3.5 h-3.5 text-white" />
             <span className="hidden sm:inline">New</span> Engagement
           </button>
 
@@ -255,7 +255,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="cursor-pointer hidden xl:flex items-center gap-2 pl-1 text-slate-700 hover:text-[#0B2545] transition-colors btn-interactive"
             title={`Active Signatory: ${signatoryName}`}
           >
-            <div className="w-7 h-7 rounded-none bg-slate-100 border border-slate-300 flex items-center justify-center font-bold text-slate-700 text-[10.5px]">
+            <div className="w-7 h-7 rounded-none bg-slate-100 hover:bg-slate-200 border border-slate-300 flex items-center justify-center font-bold text-slate-800 text-[10.5px] transition-colors">
               {initials}
             </div>
           </div>

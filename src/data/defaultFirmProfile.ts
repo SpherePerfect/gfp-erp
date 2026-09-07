@@ -9,9 +9,9 @@ export const defaultFirmProfile: FirmProfile = {
   gstin: '27AABCG9128P1Z8',
   pan: 'AABCG9128P',
   sacCode: '998311', // Management Consulting Services
-  firmEmail: 'advisory@gfpconsulting.in',
+  firmEmail: 'yogesh.kulkarni@globalfinanceprofessionals.com',
   firmPhone: '+91 93708 88819',
-  firmWebsite: 'www.gfpconsulting.in',
+  firmWebsite: 'www.gflobalfinanceprofessionals.com',
   bankDetails: {
     accountHolderName: 'GFP Management Consulting Services Pvt. Ltd.',
     bankNameBranch: 'Bank of India, Patto Plaza Branch',

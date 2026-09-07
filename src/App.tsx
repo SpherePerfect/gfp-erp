@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { EngagementEditor } from './components/EngagementEditor';
 import { TemplateManager } from './components/TemplateManager';
 import { MarketingCrm } from './components/MarketingCrm';
+import { LceCommissionTracker } from './components/LceCommissionTracker';
 import { FirmSettingsModal } from './components/FirmSettingsModal';
 import { NewEngagementModal } from './components/NewEngagementModal';
 import { SpotlightSearchModal } from './components/SpotlightSearchModal';
@@ -17,6 +18,7 @@ import {
   ClientDetails,
   CrmClientRecord,
   CustomTaxonomyConfig,
+  LceRecord,
 } from './types';
 import {
   getStoredEngagements,
@@ -35,11 +37,13 @@ import {
 } from './utils/crmStorage';
 import { getStoredTaxonomy, saveTaxonomy } from './utils/taxonomyStorage';
 import { getStoredTrashItems, addToTrash } from './utils/trashStorage';
+import { getStoredLceRecords, saveLceRecords } from './utils/lceStorage';
 import { NotificationToast, dispatchToast } from './components/NotificationToast';
 import { defaultTemplates } from './data/defaultTemplates';
 
 export default function App() {
-  const [view, setView] = useState<'dashboard' | 'editor' | 'templates' | 'crm'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'editor' | 'templates' | 'crm' | 'commission'>('dashboard');
+  const [lceRecords, setLceRecords] = useState<LceRecord[]>(() => getStoredLceRecords());
   const [engagements, setEngagements] = useState<EngagementRecord[]>(() => getStoredEngagements());
   const [crmRecords, setCrmRecords] = useState<CrmClientRecord[]>(() => {
     const loadedEngs = getStoredEngagements();
@@ -115,6 +119,11 @@ export default function App() {
   const handleSaveTemplatesList = (updated: ServiceTemplate[]) => {
     setTemplates(updated);
     saveTemplates(updated);
+  };
+
+  const handleSaveLceRecordsList = (updated: LceRecord[]) => {
+    setLceRecords(updated);
+    saveLceRecords(updated);
   };
 
   const handleSaveFirmProfileData = (updated: FirmProfile) => {
@@ -501,9 +510,102 @@ export default function App() {
           <div key="templates-view" className="animate-view-in">
             <TemplateManager
               templates={templates}
+              engagements={engagements}
               onSaveTemplates={handleSaveTemplatesList}
               onSelectTemplateForNewEngagement={(t) => {
                 handleStartNewEngagement(t);
+              }}
+              onOpenEngagement={(rec) => {
+                setSelectedEngagement(rec);
+                setView('editor');
+              }}
+              onBackToDashboard={() => setView('dashboard')}
+            />
+          </div>
+        )}
+
+        {/* VIEW 5: Partner Referral Commission Tracker (Excel-like Sheet) */}
+        {view === 'commission' && (
+          <div key="commission-view" className="animate-view-in">
+            <LceCommissionTracker
+              records={lceRecords}
+              onSaveRecords={handleSaveLceRecordsList}
+              crmRecords={crmRecords}
+              onCreateEngagementFromLce={(lce) => {
+                // Pre-fill a new engagement proposal letter from the referral partner deal
+                const allTemplates = templates && templates.length > 0 ? templates : defaultTemplates;
+                const tmpl = allTemplates[0];
+                const safeCode = tmpl?.serviceCode || 'ADV';
+                const { refNo, invoiceNo } = generateNextReference(safeCode, engagements);
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                const formattedDate = `${day}/${month}/${year}`;
+
+                const newRec: EngagementRecord = {
+                  id: `eng-${Date.now()}`,
+                  refNo,
+                  invoiceNo,
+                  date: formattedDate,
+                  validityDays: tmpl?.pricing?.validityDays || 14,
+                  client: {
+                    companyName: lce.businessName || 'Referred Business Enterprise',
+                    addresseeName: lce.ownerName || 'Director / Managing Partner',
+                    salutation: 'Dear Sir/Madam',
+                    designation: 'Managing Director / Proprietor',
+                    businessEntityType: 'Private Limited',
+                    billingAddress: lce.city ? `${lce.city}, India` : 'Corporate Office Address',
+                    state: 'Maharashtra',
+                    gstin: '',
+                    pan: '',
+                    email: '',
+                    phone: '',
+                  },
+                  signatory: firmProfile.signatories?.[0] || {
+                    id: 'sig-default',
+                    name: firmProfile.signatoryName || 'CA Yogesh Kulkarni',
+                    designation: firmProfile.signatoryDesignation || 'Director / Authorised Signatory',
+                    email: firmProfile.signatoryEmail || firmProfile.firmEmail,
+                    phone: firmProfile.signatoryPhone || firmProfile.firmPhone,
+                    isDefault: true,
+                  },
+                  service: {
+                    ...tmpl,
+                    pricing: {
+                      ...tmpl.pricing,
+                      feeAmount: lce.taxableFee || tmpl.pricing.feeAmount,
+                      isGstApplicable: lce.gstApplicable ?? true,
+                    },
+                  },
+                  services: [
+                    {
+                      ...tmpl,
+                      pricing: {
+                        ...tmpl.pricing,
+                        feeAmount: lce.taxableFee || tmpl.pricing.feeAmount,
+                        isGstApplicable: lce.gstApplicable ?? true,
+                      },
+                    },
+                  ],
+                  invoiceMilestoneType: 'advance',
+                  status: 'draft',
+                  createdBy: firmProfile?.signatoryName || 'CA Yogesh Kulkarni',
+                  createdAt: now.toISOString(),
+                  lastEditedAt: now.toISOString(),
+                  actionLog: [
+                    {
+                      timestamp: now.toISOString(),
+                      user: firmProfile?.signatoryName || 'CA Yogesh Kulkarni',
+                      action: `Created via Partner Commission Tracker deal: ${lce.businessName}`,
+                    },
+                  ],
+                };
+                const updated = [newRec, ...engagements];
+                setEngagements(updated);
+                saveEngagements(updated);
+                setSelectedEngagement(newRec);
+                setView('editor');
               }}
               onBackToDashboard={() => setView('dashboard')}
             />

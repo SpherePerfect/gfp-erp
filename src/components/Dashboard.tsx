@@ -501,7 +501,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <th className={`${density === 'compact' ? 'py-1.5 px-2.5 text-[10px]' : 'py-3 px-4'}`}>Issuer</th>
                   <th className={`${density === 'compact' ? 'py-1.5 px-2.5 text-[10px]' : 'py-3 px-4'} text-right`}>Fee & Advance</th>
                   <th className={`${density === 'compact' ? 'py-1.5 px-2.5 text-[10px]' : 'py-3 px-4'} text-center`}>Status</th>
-                  <th className={`${density === 'compact' ? 'py-1.5 px-2.5 text-[10px]' : 'py-3 px-4'} text-center`}>Actions</th>
+                  <th className={`${density === 'compact' ? 'py-1.5 px-2.5 text-[10px]' : 'py-3 px-4'} text-center w-44 min-w-[176px] max-w-[176px]`}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -610,7 +610,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </td>
 
                           {/* Actions */}
-                          <td className="py-0.5 px-2 text-center whitespace-nowrap">
+                          <td className="py-0.5 px-2 text-center whitespace-nowrap w-44 min-w-[176px] max-w-[176px]">
                             <div className="flex items-center justify-center gap-0.5">
                               <button
                                 type="button"
@@ -750,7 +750,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </td>
 
                         {/* Actions with icons and tooltips */}
-                        <td className={`${cellPadding} text-center whitespace-nowrap`}>
+                        <td className={`${cellPadding} text-center whitespace-nowrap w-44 min-w-[176px] max-w-[176px]`}>
                           <div className="flex items-center justify-center gap-1">
                             {/* Edit */}
                             <button

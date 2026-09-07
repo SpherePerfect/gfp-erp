@@ -65,10 +65,34 @@ export const LetterPreview: React.FC<LetterPreviewProps> = ({ record, firm }) =>
   const balanceGst = isPersonalNonGst ? 0 : (gstAmount - advanceGst);
   const balanceTotal = balanceTaxable + balanceGst;
 
-  // Specific Conditions resolution from record and services
+  // Specific Conditions resolution from record, services, or stored templates fallback
+  let fallbackConditions: string[] = [];
+  try {
+    const rawTemplates = localStorage.getItem('gfp_service_templates');
+    if (rawTemplates) {
+      const storedTemplates = JSON.parse(rawTemplates);
+      if (Array.isArray(storedTemplates)) {
+        const matching = storedTemplates.filter(
+          (t: any) =>
+            t &&
+            activeServices.some(
+              (s) =>
+                s.id === t.id ||
+                s.serviceCode === t.serviceCode ||
+                s.serviceTitle?.toLowerCase() === t.serviceTitle?.toLowerCase()
+            )
+        );
+        fallbackConditions = matching.flatMap((t: any) => t.additionalConditions || []);
+      }
+    }
+  } catch {
+    // Ignore fallback parse error
+  }
+
   const specificConditions: string[] = [
     ...(record.assumptions && record.assumptions.length > 0 ? record.assumptions : []),
     ...activeServices.flatMap((s) => s.additionalConditions || []),
+    ...fallbackConditions,
   ].filter((c, idx, arr) => c && c.trim() && arr.indexOf(c) === idx);
 
   const outOfScopeItems: string[] = (record.outOfScope || []).filter((o) => o && o.trim());

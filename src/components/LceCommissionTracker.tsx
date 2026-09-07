@@ -385,31 +385,41 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
   };
 
   // Excel Downloads
-  const handleExportCurrent = () => {
-    exportLceRecordsToExcel(
-      filteredRecords,
-      selectedMonth,
-      activeBeneficiary,
-      beneficiaries,
-      'GFP Advisory'
-    );
-    const label = activeBeneficiary ? activeBeneficiary.name : 'Consolidated';
-    dispatchToast({ title: `Exported ${label} Commission Register to Excel`, type: 'success' });
+  const handleExportCurrent = async () => {
+    try {
+      await exportLceRecordsToExcel(
+        filteredRecords,
+        selectedMonth,
+        activeBeneficiary,
+        beneficiaries,
+        'GFP Advisory'
+      );
+      const label = activeBeneficiary ? activeBeneficiary.name : 'Consolidated';
+      dispatchToast({ title: `Exported ${label} Commission Register to Excel`, type: 'success' });
+    } catch (err) {
+      console.error('Failed to export Excel:', err);
+      dispatchToast({ title: 'Failed to generate Excel file', type: 'warning' });
+    }
   };
 
-  const handleExportConsolidatedMaster = () => {
-    exportLceRecordsToExcel(
-      records,
-      selectedMonth,
-      null,
-      beneficiaries,
-      'GFP Advisory'
-    );
-    dispatchToast({
-      title: 'Exported Master Commission Register (All Tabs)',
-      message: 'Generated consolidated multi-sheet Excel with individual partner tabs.',
-      type: 'success',
-    });
+  const handleExportConsolidatedMaster = async () => {
+    try {
+      await exportLceRecordsToExcel(
+        records,
+        selectedMonth,
+        null,
+        beneficiaries,
+        'GFP Advisory'
+      );
+      dispatchToast({
+        title: 'Exported Master Commission Register (All Tabs)',
+        message: 'Generated consolidated multi-sheet Excel with individual partner tabs.',
+        type: 'success',
+      });
+    } catch (err) {
+      console.error('Failed to export Excel:', err);
+      dispatchToast({ title: 'Failed to generate Excel file', type: 'warning' });
+    }
   };
 
   return (
@@ -742,7 +752,7 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
                 <span className="text-[9px] font-normal text-amber-200">Rate % of col K [col M]</span>
               </th>
               <th className="py-2.5 px-3 border-r border-blue-900 min-w-[160px]">Remarks</th>
-              <th className="py-2.5 px-2 text-center whitespace-nowrap">Actions</th>
+              <th className="py-2.5 px-2 text-center whitespace-nowrap w-20 min-w-[80px] max-w-[80px]">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
@@ -842,8 +852,8 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
                     <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600 text-[11px] leading-snug">
                       {rec.remarks || '—'}
                     </td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1">
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap w-20 min-w-[80px] max-w-[80px]">
+                      <div className="inline-flex items-center justify-center gap-1 w-full">
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(rec)}
@@ -1271,22 +1281,26 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
                             },
                           });
                         }}
-                        className="p-1.5 text-slate-500 hover:text-blue-900 hover:bg-slate-100 rounded-none transition"
+                        className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-blue-900 hover:bg-slate-100 rounded-none transition"
                         title="Edit Partner"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3.5 h-3.5" />
                       </button>
 
-                      {beneficiaries.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBeneficiary(b.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-none transition"
-                          title="Remove Partner"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <div className="w-7 h-7 flex items-center justify-center shrink-0">
+                        {beneficiaries.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBeneficiary(b.id)}
+                            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-none transition"
+                            title="Remove Partner"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <div className="w-7 h-7" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

@@ -578,11 +578,32 @@ export async function exportEngagementLetterDocx(
   const igstAmount = !isPersonalNonGst && isInterState ? gstAmount : 0;
   const grandTotal = taxableSubtotal + gstAmount;
 
-  // Advance Calculation
-  const advancePercent = record.customAdvancePercent || primaryService.pricing?.customAdvancePercent || 50;
-  const advanceAmount = Math.round((taxableSubtotal * advancePercent) / 100);
-  const advanceGstAmount = isPersonalNonGst ? 0 : Math.round((advanceAmount * gstRate) / 100);
+  // Advance payment & GST logic
+  const isAdvanceGstExempt = Boolean(record.advanceExemptGst);
+  const isCollectFullAtEnd = Boolean(record.collectFullAtEnd);
+
+  const advancePercent = isCollectFullAtEnd
+    ? 0
+    : (record.customAdvancePercent || primaryService.pricing?.customAdvancePercent || 50);
+  const advanceAmount = isCollectFullAtEnd
+    ? 0
+    : Math.round((taxableSubtotal * advancePercent) / 100);
+  const advanceGstAmount = (isPersonalNonGst || isAdvanceGstExempt || isCollectFullAtEnd)
+    ? 0
+    : Math.round((advanceAmount * gstRate) / 100);
   const advanceGrandTotal = advanceAmount + advanceGstAmount;
+
+  const balanceTaxable = taxableSubtotal - advanceAmount;
+  const balanceGstAmount = isPersonalNonGst ? 0 : (gstAmount - advanceGstAmount);
+  const balanceGrandTotal = balanceTaxable + balanceGstAmount;
+
+  // Specific Conditions & Assumptions resolution from record and services
+  const specificConditions: string[] = [
+    ...(record.assumptions && record.assumptions.length > 0 ? record.assumptions : []),
+    ...activeServices.flatMap((s) => s.additionalConditions || []),
+  ].filter((c, idx, arr) => c && c.trim() && arr.indexOf(c) === idx);
+
+  const outOfScopeItems: string[] = (record.outOfScope || []).filter((o) => o && o.trim());
 
   // TDS Calculation
   let tdsAmount = 0;
@@ -1597,50 +1618,74 @@ export async function exportEngagementLetterDocx(
               right: { style: BorderStyle.SINGLE, size: 4, color: COLOR_BORDER },
               insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: COLOR_BORDER },
             },
-            rows: [
-              new TableRow({
-                cantSplit: true,
-                children: [
-                  new TableCell({
-                    width: { size: 45, type: WidthType.PERCENTAGE },
-                    margins: CELL_PADDING_COMPACT,
-                    shading: { fill: COLOR_BG_LIGHT, type: ShadingType.CLEAR },
-                    children: [new Paragraph({ children: [new TextRun({ text: `Stage 1: Mobilization Advance (${advancePercent}%)`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_NAVY })] })],
+            rows: isCollectFullAtEnd
+              ? [
+                  new TableRow({
+                    cantSplit: true,
+                    children: [
+                      new TableCell({
+                        width: { size: 45, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        shading: { fill: COLOR_BG_LIGHT, type: ShadingType.CLEAR },
+                        children: [new Paragraph({ children: [new TextRun({ text: '100% Full Professional Investment at Project Completion', bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_NAVY })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        children: [new Paragraph({ children: [new TextRun({ text: 'Payable upon final deliverable release (Advance Waived ₹0)', size: 22, font: FONT_PRIMARY, color: COLOR_SLATE })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${formatIndianCurrency(grandTotal)} ${isPersonalNonGst ? 'Non-GST' : 'incl. tax'}`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_NAVY })] })],
+                      }),
+                    ],
                   }),
-                  new TableCell({
-                    width: { size: 30, type: WidthType.PERCENTAGE },
-                    margins: CELL_PADDING_COMPACT,
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Payable prior to assignment kickoff', size: 22, font: FONT_PRIMARY, color: COLOR_SLATE })] })],
+                ]
+              : [
+                  new TableRow({
+                    cantSplit: true,
+                    children: [
+                      new TableCell({
+                        width: { size: 45, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        shading: { fill: COLOR_BG_LIGHT, type: ShadingType.CLEAR },
+                        children: [new Paragraph({ children: [new TextRun({ text: `Stage 1: Mobilization Advance (${advancePercent}%)`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_NAVY })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        children: [new Paragraph({ children: [new TextRun({ text: isAdvanceGstExempt ? 'Payable prior to kickoff (Exempt from GST on Advance)' : 'Payable prior to assignment kickoff', size: 22, font: FONT_PRIMARY, color: COLOR_SLATE })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${formatIndianCurrency(advanceGrandTotal)} ${isAdvanceGstExempt ? '(0% GST)' : isPersonalNonGst ? 'Non-GST' : 'incl. tax'}`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_COBALT })] })],
+                      }),
+                    ],
                   }),
-                  new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
-                    margins: CELL_PADDING_COMPACT,
-                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${formatIndianCurrency(advanceGrandTotal)} incl. tax`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_COBALT })] })],
+                  new TableRow({
+                    cantSplit: true,
+                    children: [
+                      new TableCell({
+                        width: { size: 45, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        shading: { fill: COLOR_BG_LIGHT, type: ShadingType.CLEAR },
+                        children: [new Paragraph({ children: [new TextRun({ text: `Stage 2: Balance Settlement (${100 - advancePercent}%)`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_NAVY })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 30, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        children: [new Paragraph({ children: [new TextRun({ text: isAdvanceGstExempt ? 'Payable upon final deliverables release (incl. full statutory GST)' : 'Payable upon final deliverables release', size: 22, font: FONT_PRIMARY, color: COLOR_SLATE })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                        margins: CELL_PADDING_COMPACT,
+                        children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${formatIndianCurrency(balanceGrandTotal)} ${isPersonalNonGst ? 'Non-GST' : 'incl. tax'}`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_CHARCOAL })] })],
+                      }),
+                    ],
                   }),
                 ],
-              }),
-              new TableRow({
-                cantSplit: true,
-                children: [
-                  new TableCell({
-                    width: { size: 45, type: WidthType.PERCENTAGE },
-                    margins: CELL_PADDING_COMPACT,
-                    shading: { fill: COLOR_BG_LIGHT, type: ShadingType.CLEAR },
-                    children: [new Paragraph({ children: [new TextRun({ text: `Stage 2: Balance Milestone (${100 - advancePercent}%)`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_NAVY })] })],
-                  }),
-                  new TableCell({
-                    width: { size: 30, type: WidthType.PERCENTAGE },
-                    margins: CELL_PADDING_COMPACT,
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Payable upon final deliverables release', size: 22, font: FONT_PRIMARY, color: COLOR_SLATE })] })],
-                  }),
-                  new TableCell({
-                    width: { size: 25, type: WidthType.PERCENTAGE },
-                    margins: CELL_PADDING_COMPACT,
-                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${formatIndianCurrency(grandTotal - advanceGrandTotal)} incl. tax`, bold: true, size: 22, font: FONT_PRIMARY, color: COLOR_CHARCOAL })] })],
-                  }),
-                ],
-              }),
-            ],
           }),
 
           createVerticalSpacer(6),
@@ -1740,40 +1785,99 @@ export async function exportEngagementLetterDocx(
 
           createVerticalSpacer(6),
 
-          // Assumptions & Out of Scope Matrix
-          createSectionHeader('Professional Assumptions & Scope Boundaries', assumptionsSecNum),
+          // Specific Conditions, Assumptions & Scope Boundaries
+          createSectionHeader('Specific Conditions, Assumptions & Scope Boundaries', assumptionsSecNum),
           createVerticalSpacer(4),
 
+          ...(specificConditions.length > 0
+            ? specificConditions.map(
+                (cond, index) =>
+                  new Paragraph({
+                    spacing: { after: 36 },
+                    children: [
+                      new TextRun({
+                        text: `${index + 1}. `,
+                        bold: true,
+                        size: 23,
+                        font: FONT_PRIMARY,
+                        color: COLOR_NAVY,
+                      }),
+                      new TextRun({
+                        text: cond,
+                        size: 23,
+                        font: FONT_PRIMARY,
+                        color: COLOR_CHARCOAL,
+                      }),
+                    ],
+                  })
+              )
+            : [
+                new Paragraph({
+                  spacing: { after: 40 },
+                  children: [
+                    new TextRun({
+                      text: '• Baseline Documentation: All findings and strategic evaluations are based upon management representations and document disclosures provided by your team.',
+                      size: 23,
+                      font: FONT_PRIMARY,
+                      color: COLOR_CHARCOAL,
+                    }),
+                  ],
+                }),
+                new Paragraph({
+                  spacing: { after: 40 },
+                  children: [
+                    new TextRun({
+                      text: '• Sovereign Approvals: Where government subsidies or bank debt limits are involved, final sanction and disbursement remain at the sole discretion of the respective sovereign committees.',
+                      size: 23,
+                      font: FONT_PRIMARY,
+                      color: COLOR_CHARCOAL,
+                    }),
+                  ],
+                }),
+              ]),
+
+          // Out of Scope items if present
+          ...(outOfScopeItems.length > 0
+            ? [
+                new Paragraph({
+                  spacing: { before: 40, after: 24 },
+                  children: [
+                    new TextRun({
+                      text: 'Specific Scope Exclusions (Out of Scope):',
+                      bold: true,
+                      size: 23,
+                      font: FONT_PRIMARY,
+                      color: 'B45309',
+                    }),
+                  ],
+                }),
+                ...outOfScopeItems.map(
+                  (ex) =>
+                    new Paragraph({
+                      spacing: { after: 24 },
+                      children: [
+                        new TextRun({
+                          text: `• ${ex}`,
+                          size: 22,
+                          font: FONT_PRIMARY,
+                          color: COLOR_CHARCOAL,
+                        }),
+                      ],
+                    })
+                ),
+              ]
+            : []),
+
+          // Standard strategic disclaimer
           new Paragraph({
-            spacing: { after: 40 },
+            spacing: { before: 40, after: 40 },
             children: [
               new TextRun({
-                text: '• Baseline Documentation: All findings and strategic evaluations are based upon management representations and document disclosures provided by your team.',
-                size: 23,
+                text: 'Unless explicitly contracted under a separate statutory mandate, our work is strictly strategic management advisory, and does not constitute a statutory audit, legal advocacy, or commercial litigation representation before appellate tribunals.',
+                italics: true,
+                size: 21,
                 font: FONT_PRIMARY,
-                color: COLOR_CHARCOAL,
-              }),
-            ],
-          }),
-          new Paragraph({
-            spacing: { after: 40 },
-            children: [
-              new TextRun({
-                text: '• Sovereign Approvals: Where government subsidies or bank debt limits are involved, final sanction and disbursement remain at the sole discretion of the respective sovereign committees.',
-                size: 23,
-                font: FONT_PRIMARY,
-                color: COLOR_CHARCOAL,
-              }),
-            ],
-          }),
-          new Paragraph({
-            spacing: { after: 40 },
-            children: [
-              new TextRun({
-                text: '• Scope Boundaries: This engagement is strictly for strategic management consulting and does not constitute statutory audit certification, legal advocacy representation, or commercial litigation representation.',
-                size: 23,
-                font: FONT_PRIMARY,
-                color: COLOR_CHARCOAL,
+                color: COLOR_SLATE,
               }),
             ],
           }),
@@ -1976,7 +2080,9 @@ export async function exportProFormaInvoiceDocx(
     firm.registeredState &&
     client.state.trim().toLowerCase() !== firm.registeredState.trim().toLowerCase();
 
-  const shouldChargeGst = !isPersonalNonGst && milestoneApplyGst;
+  const isAdvanceInvoice = record.invoiceMilestoneType === 'advance' || !record.invoiceMilestoneType;
+  const isAdvanceGstExempt = Boolean(record.advanceExemptGst) && isAdvanceInvoice;
+  const shouldChargeGst = !isPersonalNonGst && milestoneApplyGst && !isAdvanceGstExempt;
   const gstPercent = shouldChargeGst ? 18 : 0;
   const totalGstAmount = shouldChargeGst ? Math.round((baseAmount * gstPercent) / 100) : 0;
   const cgstAmount = shouldChargeGst && !isInterState ? Math.round(totalGstAmount / 2) : 0;

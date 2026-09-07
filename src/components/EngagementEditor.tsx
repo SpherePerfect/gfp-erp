@@ -705,17 +705,21 @@ export const EngagementEditor: React.FC<EngagementEditorProps> = ({
                         </p>
                       </div>
 
-                      {/* Remove service button if more than 1 */}
-                      {activeServices.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveService(idx)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-none transition"
-                          title="Remove this service from engagement"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {/* Remove service button container with fixed footprint */}
+                      <div className="w-7 h-7 flex items-center justify-center shrink-0">
+                        {activeServices.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveService(idx)}
+                            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-none transition"
+                            title="Remove this service from engagement"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <div className="w-7 h-7" />
+                        )}
+                      </div>
                     </div>
 
                     {/* Fee Allocation */}
