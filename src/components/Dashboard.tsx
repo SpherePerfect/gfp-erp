@@ -22,11 +22,12 @@ import {
   MoreVertical,
   AlertTriangle,
 } from 'lucide-react';
-import { EngagementRecord, EngagementStatus, FirmProfile } from '../types';
+import { EngagementRecord, EngagementStatus, FirmProfile, UserRole } from '../types';
 import { formatIndianCurrency } from '../utils/numberToIndianWords';
 import { downloadEngagementLetter, downloadProFormaInvoice } from '../utils/docxExport';
 import { downloadBothDocxZip } from '../utils/zipExport';
 import { KpiCard } from './KpiCard';
+import { RestrictedCell } from './RestrictedCell';
 
 interface DashboardProps {
   engagements: EngagementRecord[];
@@ -41,6 +42,7 @@ interface DashboardProps {
   onNavigateToCrm?: () => void;
   globalSearchQuery?: string;
   onGlobalSearchChange?: (q: string) => void;
+  userRole?: UserRole;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -56,7 +58,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToCrm,
   globalSearchQuery = '',
   onGlobalSearchChange,
+  userRole = 'Admin',
 }) => {
+  const isAdmin = userRole === 'Admin';
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [issuerFilter, setIssuerFilter] = useState<'all' | 'firm' | 'personal'>('all');
@@ -345,17 +349,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             iconBg="bg-blue-50"
             currentMonthLabel={monthMetrics.currentMonthLabel}
             prevMonthLabel={monthMetrics.prevMonthLabel}
-            currentValue={formatIndianCurrency(monthMetrics.current.value)}
-            prevValue={formatIndianCurrency(monthMetrics.prev.value)}
-            currentSubtitle="Aggregate fee value across mandates"
+            currentValue={isAdmin ? formatIndianCurrency(monthMetrics.current.value) : '🚫 Restricted'}
+            prevValue={isAdmin ? formatIndianCurrency(monthMetrics.prev.value) : '🚫 Restricted'}
+            currentSubtitle={isAdmin ? "Aggregate fee value across mandates" : "Restricted: Admin clearance required"}
             prevSubtitle={
-              monthMetrics.prev.value === 0
+              !isAdmin
+                ? "Restricted: Admin clearance required"
+                : monthMetrics.prev.value === 0
                 ? 'No prior billings recorded'
                 : 'Prior month closed contract volume'
             }
-            deltaText={monthMetrics.current.value >= monthMetrics.prev.value ? '+ Growth' : 'Baseline'}
+            deltaText={isAdmin ? (monthMetrics.current.value >= monthMetrics.prev.value ? '+ Growth' : 'Baseline') : 'Restricted'}
             deltaType={monthMetrics.current.value >= monthMetrics.prev.value ? 'positive' : 'neutral'}
-            interactiveTooltip={`Total portfolio volume for ${monthMetrics.currentMonthLabel}`}
+            interactiveTooltip={isAdmin ? `Total portfolio volume for ${monthMetrics.currentMonthLabel}` : 'Restricted: Financial commercials require Admin clearance'}
           />
 
           <KpiCard
@@ -366,17 +372,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             iconBg="bg-emerald-50"
             currentMonthLabel={monthMetrics.currentMonthLabel}
             prevMonthLabel={monthMetrics.prevMonthLabel}
-            currentValue={formatIndianCurrency(monthMetrics.current.advance)}
-            prevValue={formatIndianCurrency(monthMetrics.prev.advance)}
-            currentSubtitle="Target 50% milestone billing"
+            currentValue={isAdmin ? formatIndianCurrency(monthMetrics.current.advance) : '🚫 Restricted'}
+            prevValue={isAdmin ? formatIndianCurrency(monthMetrics.prev.advance) : '🚫 Restricted'}
+            currentSubtitle={isAdmin ? "Target 50% milestone billing" : "Restricted: Admin clearance required"}
             prevSubtitle={
-              monthMetrics.prev.advance === 0
+              !isAdmin
+                ? "Restricted: Admin clearance required"
+                : monthMetrics.prev.advance === 0
                 ? 'No advance billing recorded'
                 : 'Past month advance billing'
             }
-            deltaText="50% Target"
+            deltaText={isAdmin ? "50% Target" : "Restricted"}
             deltaType="positive"
-            interactiveTooltip={`Mobilization cashflow receivable: ${formatIndianCurrency(monthMetrics.current.advance)}`}
+            interactiveTooltip={isAdmin ? `Mobilization cashflow receivable: ${formatIndianCurrency(monthMetrics.current.advance)}` : 'Restricted: Financial commercials require Admin clearance'}
           />
 
           <KpiCard
@@ -596,12 +604,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                           {/* Fee & Advance */}
                           <td className="py-0.5 px-2.5 text-right whitespace-nowrap font-mono">
-                            <span className="font-bold text-slate-900 text-[11.5px]">
-                              {formatIndianCurrency(rec.service.pricing.feeAmount)}
-                            </span>
-                            <span className="text-slate-400 font-sans text-[9.5px] ml-1">
-                              ({formatIndianCurrency(advAmount)})
-                            </span>
+                            {isAdmin ? (
+                              <>
+                                <span className="font-bold text-slate-900 text-[11.5px]">
+                                  {formatIndianCurrency(rec.service.pricing.feeAmount)}
+                                </span>
+                                <span className="text-slate-400 font-sans text-[9.5px] ml-1">
+                                  ({formatIndianCurrency(advAmount)})
+                                </span>
+                              </>
+                            ) : (
+                              <RestrictedCell compact />
+                            )}
                           </td>
 
                           {/* Status */}
@@ -736,12 +750,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                         {/* Fee Value */}
                         <td className={`${cellPadding} text-right whitespace-nowrap font-mono`}>
-                          <div className="font-bold text-slate-900">
-                            {formatIndianCurrency(rec.service.pricing.feeAmount)}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-sans">
-                            Adv: {formatIndianCurrency(advAmount)}
-                          </div>
+                          {isAdmin ? (
+                            <>
+                              <div className="font-bold text-slate-900">
+                                {formatIndianCurrency(rec.service.pricing.feeAmount)}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-sans">
+                                Adv: {formatIndianCurrency(advAmount)}
+                              </div>
+                            </>
+                          ) : (
+                            <RestrictedCell />
+                          )}
                         </td>
 
                         {/* Status */}

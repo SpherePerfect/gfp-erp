@@ -48,9 +48,11 @@ import {
   FirmProfile,
   ServiceTemplate,
   CustomTaxonomyConfig,
+  UserRole,
 } from '../types';
 import { CrmRecordModal } from './CrmRecordModal';
 import { CrmActivityTimeline } from './CrmActivityTimeline';
+import { RestrictedCell } from './RestrictedCell';
 import {
   exportCrmRecordsToCsv,
   syncEngagementsWithCrm,
@@ -73,6 +75,7 @@ interface MarketingCrmProps {
   onOpenTaxonomy?: () => void;
   onOpenTrash?: () => void;
   trashCount?: number;
+  userRole?: UserRole;
 }
 
 const ALL_STAGES: CrmAssignmentStatus[] = [
@@ -114,7 +117,9 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
   onOpenTaxonomy,
   onOpenTrash,
   trashCount = 0,
+  userRole = 'Admin',
 }) => {
+  const isAdmin = userRole === 'Admin';
   // Navigation & Views
   const [activeView, setActiveView] = useState<'table' | 'kanban' | 'analytics'>('table');
   const [quickViewPill, setQuickViewPill] = useState<
@@ -881,7 +886,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Total Pipeline
           </div>
           <div className="text-lg font-black font-mono text-slate-900 mt-0.5 truncate">
-            {formatINR(metrics.totalPipelineValue)}
+            {isAdmin ? formatINR(metrics.totalPipelineValue) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-slate-500 mt-1 font-medium">Across all active mandates</div>
         </div>
@@ -891,7 +896,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Advance Realized
           </div>
           <div className="text-lg font-black font-mono text-emerald-700 mt-0.5 truncate">
-            {formatINR(metrics.totalAdvanceCollected)}
+            {isAdmin ? formatINR(metrics.totalAdvanceCollected) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-emerald-700 mt-1 font-medium">Collected in bank</div>
         </div>
@@ -901,7 +906,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Advance Pending
           </div>
           <div className="text-lg font-black font-mono text-rose-700 mt-0.5 truncate">
-            {formatINR(metrics.totalAdvancePending)}
+            {isAdmin ? formatINR(metrics.totalAdvancePending) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-rose-700 mt-1 font-medium">Follow-up needed</div>
         </div>
@@ -911,7 +916,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Post-Delivery Due
           </div>
           <div className="text-lg font-black font-mono text-indigo-950 mt-0.5 truncate">
-            {formatINR(metrics.totalPostDeliveryCommercial)}
+            {isAdmin ? formatINR(metrics.totalPostDeliveryCommercial) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-slate-500 mt-1 font-medium">Payable on report delivery</div>
         </div>
@@ -1454,12 +1459,12 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
 
                         {/* Commercials: Total */}
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                          {formatINR(rec.totalCommercial)}
+                          {isAdmin ? formatINR(rec.totalCommercial) : <RestrictedCell compact />}
                         </td>
 
                         {/* Advance Amount */}
                         <td className="py-2.5 px-3 text-right font-mono text-slate-800 whitespace-nowrap">
-                          {formatINR(rec.advanceAmount)}
+                          {isAdmin ? formatINR(rec.advanceAmount) : <RestrictedCell compact />}
                         </td>
 
                         {/* Advance Status with 1-Click Dropdown */}
@@ -1484,7 +1489,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
 
                         {/* Post-Delivery Balance (Automated) */}
                         <td className="py-2.5 px-3 text-right font-mono text-indigo-950 font-bold whitespace-nowrap bg-indigo-50/20">
-                          {formatINR(postDeliv)}
+                          {isAdmin ? formatINR(postDeliv) : <RestrictedCell compact />}
                         </td>
 
                         {/* Engagement Letter Reference / 1-Click Draft */}
@@ -1544,7 +1549,9 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
                             <td className="py-2.5 px-3 text-slate-600 font-mono text-[10.5px] truncate max-w-[150px]">{rec.email || '-'}</td>
                             <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{rec.elStartDate || '-'}</td>
                             <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{rec.reportDeliveryDate || '-'}</td>
-                            <td className="py-2.5 px-3 font-mono font-semibold text-right whitespace-nowrap">{formatINR(rec.invoiceValue)}</td>
+                            <td className="py-2.5 px-3 font-mono font-semibold text-right whitespace-nowrap">
+                              {isAdmin ? formatINR(rec.invoiceValue) : <RestrictedCell compact />}
+                            </td>
                             <td className="py-2.5 px-3 text-indigo-900 font-medium truncate max-w-[160px]">{rec.postCompletionPotential}</td>
                             <td className="py-2.5 px-3 font-semibold text-slate-800 whitespace-nowrap">{rec.finalStatus}</td>
                             <td className="py-2.5 px-3 text-slate-400 font-mono text-[10px] whitespace-nowrap">{rec.updatedAt}</td>
@@ -1705,12 +1712,18 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
                           )}
 
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                            <span className="font-mono font-bold text-slate-900">
-                              {formatINR(r.totalCommercial)}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              Adv: {formatINR(r.advanceAmount)}
-                            </span>
+                            {isAdmin ? (
+                              <>
+                                <span className="font-mono font-bold text-slate-900">
+                                  {formatINR(r.totalCommercial)}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  Adv: {formatINR(r.advanceAmount)}
+                                </span>
+                              </>
+                            ) : (
+                              <RestrictedCell compact />
+                            )}
                           </div>
 
                           {/* 1-Click Quick Stage Movement (Forward & Back) */}

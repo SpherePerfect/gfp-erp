@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "user": {
+      "title": "App User",
+      "description": "User account profile with custom job title, role, and avatar",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "photoUrl": { "type": "string" },
+        "jobTitle": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["Admin", "Partner", "Associate", "Viewer"] },
+        "department": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["Active", "Suspended"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "isFirstAdmin": { "type": "boolean" }
+      },
+      "required": ["uid", "email", "displayName", "role", "status", "createdAt"]
+    },
+    "admin": {
+      "title": "Admin Role Marker",
+      "description": "Document marker for users with primary Admin privileges",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "assignedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "engagement": {
+      "title": "Engagement Record",
+      "description": "Charter engagement letter proposal, invoice and service delivery terms",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "refNo": { "type": "string" },
+        "invoiceNo": { "type": "string" },
+        "date": { "type": "string" },
+        "validityDays": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastEditedAt": { "type": "string" }
+      },
+      "required": ["id", "refNo", "status", "createdAt"]
+    },
+    "crmRecord": {
+      "title": "CRM Lead Record",
+      "description": "34-column commercial marketing pipeline and client lead tracking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "srNo": { "type": "number" },
+        "clientName": { "type": "string" },
+        "natureOfDeliverable": { "type": "string" },
+        "totalCommercial": { "type": "number" },
+        "advanceAmount": { "type": "number" },
+        "leadStage": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "clientName", "createdAt"]
+    },
+    "lceRecord": {
+      "title": "LCE Commission Record",
+      "description": "Partner referral commission calculation and payout ledger entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "month": { "type": "string" },
+        "sNo": { "type": "number" },
+        "businessName": { "type": "string" },
+        "taxableFee": { "type": "number" },
+        "commissionPayable": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "businessName", "taxableFee", "createdAt"]
+    },
+    "template": {
+      "title": "Service Master Template",
+      "description": "Pre-configured advisory service template with deliverables and pricing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "serviceCode": { "type": "string" },
+        "serviceTitle": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "serviceCode", "serviceTitle"]
+    },
+    "firmProfile": {
+      "title": "Firm Profile Config",
+      "description": "Firm branding, letterhead details, signatories, banking, and tax info",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firmName": { "type": "string" },
+        "firmEmail": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "firmName"]
+    },
+    "taxonomy": {
+      "title": "Custom Taxonomy",
+      "description": "Custom dropdown options for statuses, stages, industries, and categories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "trash": {
+      "title": "Trash Bin Item",
+      "description": "Recycled engagement or CRM record with recovery snapshot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemType": { "type": "string" },
+        "title": { "type": "string" },
+        "deletedAt": { "type": "string" },
+        "deletedBy": { "type": "string" }
+      },
+      "required": ["id", "itemType", "title", "deletedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profiles with job titles, roles, and avatar image"
+    },
+    "/admins/{userId}": {
+      "schema": "admin",
+      "description": "Admin authorization markers for Zero-Trust Firestore Security verification"
+    },
+    "/engagements/{engagementId}": {
+      "schema": "engagement",
+      "description": "Advisory charter engagements and invoice proposals"
+    },
+    "/crmRecords/{recordId}": {
+      "schema": "crmRecord",
+      "description": "Enterprise marketing CRM client leads and pipeline entries"
+    },
+    "/lceRecords/{recordId}": {
+      "schema": "lceRecord",
+      "description": "Channel and referral partner commission records"
+    },
+    "/templates/{templateId}": {
+      "schema": "template",
+      "description": "Master service offerings and scope blueprints"
+    },
+    "/firmProfile/{profileId}": {
+      "schema": "firmProfile",
+      "description": "Firm configuration and letterhead metadata"
+    },
+    "/taxonomy/{taxonomyId}": {
+      "schema": "taxonomy",
+      "description": "Customizable list options and taxonomies"
+    },
+    "/trash/{trashId}": {
+      "schema": "trash",
+      "description": "Deleted items preserved for millisecond-precision restore"
+    }
+  }
+}

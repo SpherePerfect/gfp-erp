@@ -431,4 +431,22 @@ export interface KanbanColumnConfig {
   badge: string;
 }
 
+export type UserRole = 'Admin' | 'Partner' | 'Associate' | 'Viewer';
+
+export interface AppUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoUrl?: string;
+  jobTitle?: string;
+  role: UserRole;
+  department?: string;
+  phone?: string;
+  status: 'Active' | 'Suspended';
+  createdAt: string;
+  updatedAt?: string;
+  lastLoginAt?: string;
+  isFirstAdmin?: boolean;
+}
+
 

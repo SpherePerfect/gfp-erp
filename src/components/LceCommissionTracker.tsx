@@ -23,7 +23,7 @@ import {
   CreditCard,
   Download,
 } from 'lucide-react';
-import { LceRecord, CrmClientRecord, CommissionBeneficiary } from '../types';
+import { LceRecord, CrmClientRecord, CommissionBeneficiary, UserRole } from '../types';
 import {
   calculateLceFields,
   saveLceRecords,
@@ -35,6 +35,7 @@ import {
 import { exportLceRecordsToExcel } from '../utils/lceExcelExport';
 import { formatIndianCurrency } from '../utils/numberToIndianWords';
 import { dispatchToast } from './NotificationToast';
+import { RestrictedCell } from './RestrictedCell';
 
 interface LceCommissionTrackerProps {
   records: LceRecord[];
@@ -42,6 +43,7 @@ interface LceCommissionTrackerProps {
   crmRecords?: CrmClientRecord[];
   onCreateEngagementFromLce?: (record: LceRecord) => void;
   onBackToDashboard?: () => void;
+  userRole?: UserRole;
 }
 
 export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
@@ -50,7 +52,9 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
   crmRecords = [],
   onCreateEngagementFromLce,
   onBackToDashboard,
+  userRole = 'Admin',
 }) => {
+  const isAdmin = userRole === 'Admin';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -567,12 +571,12 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
             <Building2 className="w-4 h-4 text-blue-900" />
           </div>
           <div className="text-xl font-black text-slate-900">
-            {formatIndianCurrency(stats.totalInvoiced)}
+            {isAdmin ? formatIndianCurrency(stats.totalInvoiced) : '🚫 Restricted'}
           </div>
           <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
             <span>{stats.totalDeals} deals</span>
             <span>•</span>
-            <span>Taxable: {formatIndianCurrency(stats.totalTaxable)}</span>
+            <span>Taxable: {isAdmin ? formatIndianCurrency(stats.totalTaxable) : 'Restricted'}</span>
           </div>
         </div>
 
@@ -582,10 +586,10 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
             <DollarSign className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-xl font-black text-emerald-700">
-            {formatIndianCurrency(stats.totalReceived)}
+            {isAdmin ? formatIndianCurrency(stats.totalReceived) : '🚫 Restricted'}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Basic + Tax collections to date
+            {isAdmin ? 'Basic + Tax collections to date' : 'Admin clearance required'}
           </div>
         </div>
 
@@ -595,10 +599,10 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
             <FileText className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="text-xl font-black text-[#0B2545]">
-            {formatIndianCurrency(stats.taxableReceivedBasis)}
+            {isAdmin ? formatIndianCurrency(stats.taxableReceivedBasis) : '🚫 Restricted'}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Col K: Basis for commission calculations
+            {isAdmin ? 'Col K: Basis for commission calculations' : 'Admin clearance required'}
           </div>
         </div>
 
@@ -612,10 +616,10 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
             </span>
           </div>
           <div className="text-xl font-black text-[#0B2545]">
-            {formatIndianCurrency(stats.totalCommissionPayable)}
+            {isAdmin ? formatIndianCurrency(stats.totalCommissionPayable) : '🚫 Restricted'}
           </div>
           <div className="text-[11px] text-blue-900 font-medium mt-1">
-            Payable on realized fees [Col M]
+            {isAdmin ? 'Payable on realized fees [Col M]' : 'Confidential Admin metric'}
           </div>
         </div>
       </div>
@@ -811,13 +815,13 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
                       </span>
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono font-semibold text-slate-900">
-                      {formatIndianCurrency(rec.taxableFee)}
+                      {isAdmin ? formatIndianCurrency(rec.taxableFee) : <RestrictedCell compact />}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono text-slate-600">
-                      {formatIndianCurrency(rec.gstAmount)}
+                      {isAdmin ? formatIndianCurrency(rec.gstAmount) : <RestrictedCell compact />}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono font-bold text-[#0B2545]">
-                      {formatIndianCurrency(rec.totalInvoiceAmount)}
+                      {isAdmin ? formatIndianCurrency(rec.totalInvoiceAmount) : <RestrictedCell compact />}
                     </td>
                     <td className="py-2.5 px-2.5 border-r border-slate-200 text-center whitespace-nowrap">
                       <span
@@ -835,19 +839,25 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
                       </span>
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono font-semibold text-slate-900">
-                      {formatIndianCurrency(rec.totalAmountReceived)}
+                      {isAdmin ? formatIndianCurrency(rec.totalAmountReceived) : <RestrictedCell compact />}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono font-bold text-blue-950 bg-blue-50/40">
-                      {formatIndianCurrency(rec.taxableAmountReceived)}
+                      {isAdmin ? formatIndianCurrency(rec.taxableAmountReceived) : <RestrictedCell compact />}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono text-slate-600">
-                      {formatIndianCurrency(rec.gstAmountReceived)}
+                      {isAdmin ? formatIndianCurrency(rec.gstAmountReceived) : <RestrictedCell compact />}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-right font-mono font-black text-emerald-800 bg-emerald-50/50">
-                      <div>{formatIndianCurrency(rec.commissionPayable)}</div>
-                      <span className="text-[9px] font-normal text-slate-500">
-                        @{rec.commissionRatePercent ?? 20}%
-                      </span>
+                      {isAdmin ? (
+                        <>
+                          <div>{formatIndianCurrency(rec.commissionPayable)}</div>
+                          <span className="text-[9px] font-normal text-slate-500">
+                            @{rec.commissionRatePercent ?? 20}%
+                          </span>
+                        </>
+                      ) : (
+                        <RestrictedCell compact />
+                      )}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600 text-[11px] leading-snug">
                       {rec.remarks || '—'}

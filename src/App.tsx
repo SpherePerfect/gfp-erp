@@ -10,6 +10,7 @@ import { NewEngagementModal } from './components/NewEngagementModal';
 import { SpotlightSearchModal } from './components/SpotlightSearchModal';
 import { TrashModal } from './components/TrashModal';
 import { CustomTaxonomyModal } from './components/CustomTaxonomyModal';
+import { AdminUserManagementModal } from './components/AdminUserManagementModal';
 import {
   EngagementRecord,
   EngagementStatus,
@@ -19,7 +20,36 @@ import {
   CrmClientRecord,
   CustomTaxonomyConfig,
   LceRecord,
+  AppUser,
+  UserRole,
 } from './types';
+import {
+  auth,
+  signInWithGoogle,
+  logOutUser,
+  PRIMARY_ADMIN_EMAIL,
+} from './firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import {
+  subscribeToUsers,
+  subscribeToEngagements,
+  subscribeToCrmRecords,
+  subscribeToLceRecords,
+  subscribeToTemplates,
+  subscribeToFirmProfile,
+  subscribeToTaxonomy,
+  subscribeToTrash,
+  saveUserDoc,
+  deleteUserDoc,
+  saveEngagementDoc,
+  deleteEngagementDoc,
+  saveCrmRecordDoc,
+  deleteCrmRecordDoc,
+  saveLceRecordDoc,
+  deleteLceRecordDoc,
+  saveTemplateDoc,
+  saveFirmProfileDoc,
+} from './utils/firestoreSync';
 import {
   getStoredEngagements,
   getStoredFirmProfile,
@@ -40,6 +70,18 @@ import { getStoredTrashItems, addToTrash } from './utils/trashStorage';
 import { getStoredLceRecords, saveLceRecords } from './utils/lceStorage';
 import { NotificationToast, dispatchToast } from './components/NotificationToast';
 import { defaultTemplates } from './data/defaultTemplates';
+
+const DEFAULT_PRIMARY_ADMIN: AppUser = {
+  uid: 'admin-yogesh-01',
+  email: PRIMARY_ADMIN_EMAIL,
+  displayName: 'CA Yogesh Kulkarni',
+  jobTitle: 'Managing Partner & Practice Head',
+  department: 'Executive Leadership',
+  role: 'Admin',
+  status: 'Active',
+  createdAt: '2026-09-01T00:00:00.000Z',
+  isFirstAdmin: true,
+};
 
 export default function App() {
   const [view, setView] = useState<'dashboard' | 'editor' | 'templates' | 'crm' | 'commission'>('dashboard');
@@ -67,25 +109,140 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [editorReturnView, setEditorReturnView] = useState<'dashboard' | 'crm'>('dashboard');
 
+  // RBAC & Authentication State
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(() => auth.currentUser);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(DEFAULT_PRIMARY_ADMIN);
+  const [allUsers, setAllUsers] = useState<AppUser[]>([DEFAULT_PRIMARY_ADMIN]);
+  const [simulatedRole, setSimulatedRole] = useState<UserRole | undefined>(undefined);
+  const [isAdminUserModalOpen, setIsAdminUserModalOpen] = useState(false);
+
+  const effectiveRole: UserRole = simulatedRole || currentUser?.role || 'Admin';
+
   const refreshTrashCount = () => {
     setTrashCount(getStoredTrashItems().length);
   };
 
-  // Load from local storage on mount (reconcile if any new updates)
+  // Real-time Firestore Listeners:
+  // Firm Profile, Taxonomy, and Templates sync immediately
+  // Authenticated collections (Engagements, CRM, LCE, Users, Trash) attach when user is signed in
   useEffect(() => {
-    const loadedEngs = getStoredEngagements();
-    const loadedTemps = getStoredTemplates();
-    const loadedProfile = getStoredFirmProfile();
-    const loadedCrm = getStoredCrmRecords();
+    const unsubFirm = subscribeToFirmProfile((firm) => {
+      if (firm) {
+        setFirmProfile(firm);
+      }
+    });
 
-    setEngagements(loadedEngs);
-    setTemplates(loadedTemps && loadedTemps.length > 0 ? loadedTemps : defaultTemplates);
-    setFirmProfile(loadedProfile);
+    const unsubTax = subscribeToTaxonomy((tax) => {
+      if (tax) {
+        setCustomTaxonomy(tax);
+      }
+    });
 
-    // Auto-sync engagements with CRM leads on startup so everything is connected
-    const syncedCrm = syncEngagementsWithCrm(loadedEngs, loadedCrm);
-    setCrmRecords(syncedCrm);
-  }, []);
+    const unsubTmpl = subscribeToTemplates((tmpls) => {
+      if (tmpls && tmpls.length > 0) {
+        setTemplates(tmpls);
+      }
+    }, defaultTemplates);
+
+    if (!firebaseUser) {
+      return () => {
+        unsubFirm();
+        unsubTax();
+        unsubTmpl();
+      };
+    }
+
+    const unsubUsers = subscribeToUsers((users) => {
+      if (users && users.length > 0) {
+        setAllUsers(users);
+        if (currentUser) {
+          const matched = users.find((u) => u.uid === currentUser.uid);
+          if (matched) setCurrentUser(matched);
+        }
+      }
+    }, [DEFAULT_PRIMARY_ADMIN]);
+
+    const unsubEng = subscribeToEngagements((engs) => {
+      if (engs && engs.length > 0) {
+        setEngagements(engs);
+      }
+    }, getStoredEngagements());
+
+    const unsubCrm = subscribeToCrmRecords((crms) => {
+      if (crms && crms.length > 0) {
+        setCrmRecords(crms);
+      }
+    }, getStoredCrmRecords());
+
+    const unsubLce = subscribeToLceRecords((lces) => {
+      if (lces && lces.length > 0) {
+        setLceRecords(lces);
+      }
+    }, getStoredLceRecords());
+
+    const unsubTrash = subscribeToTrash((items) => {
+      if (items) {
+        setTrashCount(items.length);
+      }
+    });
+
+    return () => {
+      unsubFirm();
+      unsubTax();
+      unsubTmpl();
+      unsubUsers();
+      unsubEng();
+      unsubCrm();
+      unsubLce();
+      unsubTrash();
+    };
+  }, [firebaseUser]);
+
+  // Firebase Auth Listener
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser) {
+        const existing = allUsers.find(
+          (u) =>
+            u.uid === fbUser.uid ||
+            u.email.toLowerCase() === (fbUser.email || '').toLowerCase()
+        );
+        if (existing) {
+          setCurrentUser(existing);
+        } else {
+          // If first user or matches PRIMARY_ADMIN_EMAIL, make Admin
+          const isFirst =
+            allUsers.length === 0 ||
+            allUsers.every((u) => u.uid === 'admin-yogesh-01') ||
+            (fbUser.email &&
+              fbUser.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase());
+
+          const newUser: AppUser = {
+            uid: fbUser.uid,
+            email: fbUser.email || '',
+            displayName: fbUser.displayName || 'Authorized Team Member',
+            photoUrl: fbUser.photoURL || undefined,
+            jobTitle: isFirst ? 'Managing Partner & Practice Head' : 'Associate Consultant',
+            department: 'Corporate Advisory',
+            role: isFirst ? 'Admin' : 'Associate',
+            status: 'Active',
+            createdAt: new Date().toISOString(),
+            isFirstAdmin: isFirst,
+          };
+          await saveUserDoc(newUser);
+          setCurrentUser(newUser);
+        }
+      } else {
+        // Retain default primary admin profile when unauthenticated in preview
+        if (!currentUser) {
+          setCurrentUser(DEFAULT_PRIMARY_ADMIN);
+        }
+      }
+    });
+
+    return () => unsubAuth();
+  }, [allUsers]);
 
   // Global Command+K or Ctrl+K shortcut to toggle Apple Spotlight modal
   useEffect(() => {
@@ -100,10 +257,83 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Save changes to storage
+  // Auth Action Handlers
+  const handleGoogleSignIn = async () => {
+    try {
+      const user = await signInWithGoogle();
+      if (user) {
+        dispatchToast({
+          title: 'Authenticated Successfully',
+          message: `Signed in as ${user.displayName || user.email}. Live Firestore sync enabled.`,
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      dispatchToast({
+        title: 'Sign In Information',
+        message: err.message || 'Popups may be blocked in iframe preview. Using Admin session.',
+        type: 'info',
+      });
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logOutUser();
+      setCurrentUser(DEFAULT_PRIMARY_ADMIN);
+      dispatchToast({
+        title: 'Signed Out',
+        message: 'Reverted to primary administrator profile.',
+        type: 'info',
+      });
+    } catch (err: any) {
+      console.error('Sign out error:', err);
+    }
+  };
+
+  const handleToggleRoleSimulator = () => {
+    setSimulatedRole((prev) => {
+      const next = prev === 'Associate' ? 'Admin' : 'Associate';
+      dispatchToast({
+        title: 'Role-Based Access Control',
+        message: `Now viewing as ${next} (${next === 'Admin' ? 'All financial columns visible' : 'Sensitive commercials masked with Zero-Trust'})`,
+        type: 'info',
+      });
+      return next;
+    });
+  };
+
+  // User Management Actions
+  const handleSaveUser = async (user: AppUser) => {
+    await saveUserDoc(user);
+    setAllUsers((prev) => {
+      const idx = prev.findIndex((u) => u.uid === user.uid);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = user;
+        return next;
+      }
+      return [...prev, user];
+    });
+    if (currentUser?.uid === user.uid) {
+      setCurrentUser(user);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    await deleteUserDoc(uid);
+    setAllUsers((prev) => prev.filter((u) => u.uid !== uid));
+  };
+
+  // Save changes to storage & real-time Firestore
   const handleSaveEngagementsList = (updated: EngagementRecord[]) => {
     setEngagements(updated);
     saveEngagements(updated);
+    // sync to firestore
+    updated.forEach((rec) => {
+      saveEngagementDoc(rec).catch((err) => console.error('Firestore engagement sync error:', err));
+    });
 
     // Update CRM records sync
     const synced = syncEngagementsWithCrm(updated, crmRecords);
@@ -114,21 +344,31 @@ export default function App() {
   const handleSaveCrmRecordsList = (updated: CrmClientRecord[]) => {
     setCrmRecords(updated);
     saveCrmRecords(updated);
+    updated.forEach((rec) => {
+      saveCrmRecordDoc(rec).catch((err) => console.error('Firestore crm sync error:', err));
+    });
   };
 
   const handleSaveTemplatesList = (updated: ServiceTemplate[]) => {
     setTemplates(updated);
     saveTemplates(updated);
+    updated.forEach((tmpl) => {
+      saveTemplateDoc(tmpl).catch((err) => console.error('Firestore template sync error:', err));
+    });
   };
 
   const handleSaveLceRecordsList = (updated: LceRecord[]) => {
     setLceRecords(updated);
     saveLceRecords(updated);
+    updated.forEach((lce) => {
+      saveLceRecordDoc(lce).catch((err) => console.error('Firestore lce sync error:', err));
+    });
   };
 
   const handleSaveFirmProfileData = (updated: FirmProfile) => {
     setFirmProfile(updated);
     saveFirmProfile(updated);
+    saveFirmProfileDoc(updated).catch((err) => console.error('Firestore firm profile sync error:', err));
   };
 
   // Create new engagement from CRM Lead in 1 click
@@ -423,7 +663,17 @@ export default function App() {
       {/* Navigation */}
       <Navbar
         currentView={view}
-        onNavigate={(v) => setView(v)}
+        onNavigate={(v) => {
+          setView(v);
+          setSelectedEngagement(null);
+        }}
+        currentUser={currentUser}
+        userRole={effectiveRole}
+        onSignInWithGoogle={handleGoogleSignIn}
+        onSignOut={handleSignOut}
+        onOpenAdminUserManagement={() => setIsAdminUserModalOpen(true)}
+        onToggleRoleSimulator={handleToggleRoleSimulator}
+        isRoleSimulated={!!simulatedRole}
         onOpenSettings={() => {
           setSettingsInitialTab('theme');
           setIsSettingsOpen(true);
@@ -439,6 +689,7 @@ export default function App() {
         onOpenTaxonomy={() => setIsTaxonomyOpen(true)}
         firmProfile={firmProfile}
         crmCount={crmRecords.length}
+        commissionCount={lceRecords.length}
         globalSearch={globalSearch}
         onGlobalSearchChange={(q) => {
           setGlobalSearch(q);
@@ -466,6 +717,7 @@ export default function App() {
               onNavigateToCrm={() => setView('crm')}
               globalSearchQuery={globalSearch}
               onGlobalSearchChange={setGlobalSearch}
+              userRole={effectiveRole}
             />
           </div>
         )}
@@ -486,6 +738,7 @@ export default function App() {
               onOpenTaxonomy={() => setIsTaxonomyOpen(true)}
               onOpenTrash={() => setIsTrashOpen(true)}
               trashCount={trashCount}
+              userRole={effectiveRole}
             />
           </div>
         )}
@@ -608,6 +861,7 @@ export default function App() {
                 setView('editor');
               }}
               onBackToDashboard={() => setView('dashboard')}
+              userRole={effectiveRole}
             />
           </div>
         )}
@@ -667,6 +921,16 @@ export default function App() {
         onClose={() => setIsTaxonomyOpen(false)}
         taxonomy={customTaxonomy}
         onSaveTaxonomy={handleSaveTaxonomy}
+      />
+
+      {/* Admin User Management & Granular RBAC Modal */}
+      <AdminUserManagementModal
+        isOpen={isAdminUserModalOpen}
+        onClose={() => setIsAdminUserModalOpen(false)}
+        users={allUsers}
+        currentUserId={currentUser?.uid || ''}
+        onSaveUser={handleSaveUser}
+        onDeleteUser={handleDeleteUser}
       />
 
       {/* Global Apple-style Spring Animated Notification Toasts */}
