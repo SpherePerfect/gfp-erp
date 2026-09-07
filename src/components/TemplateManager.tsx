@@ -33,7 +33,7 @@ interface TemplateManagerProps {
 }
 
 export const TemplateManager: React.FC<TemplateManagerProps> = ({
-  templates,
+  templates = [],
   engagements = [],
   onSaveTemplates,
   onSelectTemplateForNewEngagement,
@@ -125,7 +125,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({
   // Delete single template (confirmed via in-app modal)
   const handleConfirmDeleteOne = () => {
     if (!templateToDelete) return;
-    const updated = templates.filter((t) => t.id !== templateToDelete.id);
+    const updated = (templates || []).filter((t) => t.id !== templateToDelete.id);
     onSaveTemplates(updated);
     setTemplateToDelete(null);
   };
@@ -752,11 +752,11 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({
                         />
                       </div>
                       <div className="sm:col-span-1 text-center pt-5 sm:pt-0">
-                        {editingTemplate.pricing.paymentSplit.length > 1 && (
+                        {(editingTemplate.pricing?.paymentSplit || []).length > 1 && (
                           <button
                             type="button"
                             onClick={() => {
-                              const updated = editingTemplate.pricing.paymentSplit.filter((_, i) => i !== idx);
+                              const updated = (editingTemplate.pricing?.paymentSplit || []).filter((_, i) => i !== idx);
                               setEditingTemplate({
                                 ...editingTemplate,
                                 pricing: { ...editingTemplate.pricing, paymentSplit: updated },

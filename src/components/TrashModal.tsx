@@ -37,7 +37,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
   onRestoreEngagement,
   onTrashUpdated,
 }) => {
-  const [items, setItems] = useState<TrashItem[]>(() => getStoredTrashItems());
+  const [items, setItems] = useState<TrashItem[]>(() => getStoredTrashItems() || []);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'crm_lead' | 'engagement'>('all');
   const [confirmEmptyAll, setConfirmEmptyAll] = useState(false);
@@ -46,14 +46,14 @@ export const TrashModal: React.FC<TrashModalProps> = ({
   // Refresh items whenever modal opens
   React.useEffect(() => {
     if (isOpen) {
-      setItems(getStoredTrashItems());
+      setItems(getStoredTrashItems() || []);
       setConfirmEmptyAll(false);
       setInspectingItem(null);
     }
   }, [isOpen]);
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    return (items || []).filter((item) => {
       const matchesType = typeFilter === 'all' || item.itemType === typeFilter;
       const q = searchQuery.toLowerCase().trim();
       if (!q) return matchesType;
@@ -67,7 +67,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
 
   const handleRestore = (item: TrashItem) => {
     removeFromTrash(item.id);
-    const updated = items.filter((i) => i.id !== item.id);
+    const updated = (items || []).filter((i) => i.id !== item.id);
     setItems(updated);
     if (onTrashUpdated) onTrashUpdated();
 
@@ -94,7 +94,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
 
   const handlePermanentDeleteSingle = (itemId: string) => {
     removeFromTrash(itemId);
-    const updated = items.filter((i) => i.id !== itemId);
+    const updated = (items || []).filter((i) => i.id !== itemId);
     setItems(updated);
     if (onTrashUpdated) onTrashUpdated();
 
@@ -210,7 +210,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Leads & Deals ({items.filter((i) => i.itemType === 'crm_lead').length})
+                  Leads & Deals ({(items || []).filter((i) => i.itemType === 'crm_lead').length})
                 </button>
                 <button
                   type="button"
@@ -221,7 +221,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Engagement Letters ({items.filter((i) => i.itemType === 'engagement').length})
+                  Engagement Letters ({(items || []).filter((i) => i.itemType === 'engagement').length})
                 </button>
               </div>
 

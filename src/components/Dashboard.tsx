@@ -46,7 +46,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  engagements,
+  engagements = [],
   firmProfile,
   onNewEngagement,
   onEditEngagement,
@@ -60,6 +60,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onGlobalSearchChange,
   userRole = 'Admin',
 }) => {
+  const safeEngagements = useMemo(
+    () => (Array.isArray(engagements) ? engagements : []),
+    [engagements]
+  );
   const isAdmin = userRole === 'Admin';
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -71,7 +75,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const activeSearch = globalSearchQuery.trim() ? globalSearchQuery : localSearchQuery;
 
   const filteredEngagements = useMemo(() => {
-    return engagements.filter((e) => {
+    return safeEngagements.filter((e) => {
       const query = activeSearch.toLowerCase().trim();
       const matchesQuery =
         !query ||
@@ -127,20 +131,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
     const prevMonthLabel = prevDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 
-    let thisMonthEngs = engagements.filter((e) => {
+    let thisMonthEngs = safeEngagements.filter((e) => {
       const d = parseRecordDate(e);
       return d.getMonth() === currMonth && d.getFullYear() === currYear;
     });
 
-    let prevMonthEngs = engagements.filter((e) => {
+    let prevMonthEngs = safeEngagements.filter((e) => {
       const d = parseRecordDate(e);
       return d.getMonth() === prevMonth && d.getFullYear() === prevYear;
     });
 
-    const calcValues = (list: EngagementRecord[]) => {
-      const count = list.length;
-      const value = list.reduce((sum, e) => sum + (e.service?.pricing?.feeAmount || 0), 0);
-      const advance = list.reduce((sum, e) => {
+    const calcValues = (list: EngagementRecord[] = []) => {
+      const safeList = Array.isArray(list) ? list : [];
+      const count = safeList.length;
+      const value = safeList.reduce((sum, e) => sum + (e.service?.pricing?.feeAmount || 0), 0);
+      const advance = safeList.reduce((sum, e) => {
         const advPercent =
           e.customAdvancePercent && e.customAdvancePercent > 0
             ? e.customAdvancePercent
@@ -149,10 +154,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               50;
         return sum + ((e.service?.pricing?.feeAmount || 0) * advPercent) / 100;
       }, 0);
-      const approved = list.filter((e) => e.status === 'approved' || e.status === 'invoiced').length;
-      const draft = list.filter((e) => e.status === 'draft').length;
-      const sent = list.filter((e) => e.status === 'letter_sent').length;
-      const personalNonGst = list.filter(
+      const approved = safeList.filter((e) => e.status === 'approved' || e.status === 'invoiced').length;
+      const draft = safeList.filter((e) => e.status === 'draft').length;
+      const sent = safeList.filter((e) => e.status === 'letter_sent').length;
+      const personalNonGst = safeList.filter(
         (e) => e.invoiceIssuerType === 'personal' || e.isNonGstInvoice === true
       ).length;
 
@@ -169,15 +174,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       current: currentStats,
       prev: prevStats,
     };
-  }, [engagements]);
+  }, [safeEngagements]);
 
   // Aggregate Metrics for clean cards
   const totalValue = useMemo(() => {
-    return engagements.reduce((sum, e) => sum + (e.service.pricing.feeAmount || 0), 0);
-  }, [engagements]);
+    return safeEngagements.reduce((sum, e) => sum + (e.service.pricing.feeAmount || 0), 0);
+  }, [safeEngagements]);
 
   const totalAdvanceReceivable = useMemo(() => {
-    return engagements.reduce((sum, e) => {
+    return safeEngagements.reduce((sum, e) => {
       const advPercent =
         e.customAdvancePercent && e.customAdvancePercent > 0
           ? e.customAdvancePercent
@@ -186,20 +191,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             50;
       return sum + (e.service.pricing.feeAmount * advPercent) / 100;
     }, 0);
-  }, [engagements]);
+  }, [safeEngagements]);
 
   const statusCounts = useMemo(() => {
     return {
-      all: engagements.length,
-      draft: engagements.filter((e) => e.status === 'draft').length,
-      letter_sent: engagements.filter((e) => e.status === 'letter_sent').length,
-      approved: engagements.filter((e) => e.status === 'approved').length,
-      invoiced: engagements.filter((e) => e.status === 'invoiced').length,
-      personalNonGst: engagements.filter(
+      all: safeEngagements.length,
+      draft: safeEngagements.filter((e) => e.status === 'draft').length,
+      letter_sent: safeEngagements.filter((e) => e.status === 'letter_sent').length,
+      approved: safeEngagements.filter((e) => e.status === 'approved').length,
+      invoiced: safeEngagements.filter((e) => e.status === 'invoiced').length,
+      personalNonGst: safeEngagements.filter(
         (e) => e.invoiceIssuerType === 'personal' || e.isNonGstInvoice === true
       ).length,
     };
-  }, [engagements]);
+  }, [safeEngagements]);
 
   const handleDownloadLetter = async (rec: EngagementRecord) => {
     try {

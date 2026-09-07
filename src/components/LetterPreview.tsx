@@ -398,7 +398,7 @@ export const LetterPreview: React.FC<LetterPreviewProps> = ({ record, firm }) =>
                     <td className="py-2.5 px-3 border-r border-blue-100">
                       <p className="font-bold text-slate-900">{srv.serviceTitle}</p>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        {srv.deliverables.filter((d) => d.include).length} key deliverables included
+                        {(srv.deliverables || []).filter((d) => d.include).length} key deliverables included
                       </p>
                     </td>
                     <td className="py-2.5 px-3 text-center text-slate-700 font-mono border-r border-blue-100">
@@ -426,7 +426,7 @@ export const LetterPreview: React.FC<LetterPreviewProps> = ({ record, firm }) =>
             const prefix = isMultiService ? `${scopeSecNum}.${sIdx + 1}` : scopeSecNum;
             // Dynamically number ONLY the selected/included deliverables
             const numberedDels = getNumberedDeliverables(
-              srv.deliverables.filter((d) => d.include),
+              (srv.deliverables || []).filter((d) => d.include),
               prefix
             );
 

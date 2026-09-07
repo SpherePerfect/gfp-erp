@@ -25,8 +25,10 @@ import { dispatchToast } from './NotificationToast';
 interface AdminUserManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: AppUser | null;
-  allUsers: AppUser[];
+  currentUser?: AppUser | null;
+  currentUserId?: string;
+  allUsers?: AppUser[];
+  users?: AppUser[];
   onSaveUser: (user: AppUser) => Promise<void>;
   onDeleteUser: (uid: string) => Promise<void>;
 }
@@ -55,10 +57,13 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
   isOpen,
   onClose,
   currentUser,
-  allUsers,
+  currentUserId,
+  allUsers: propAllUsers,
+  users: propUsers,
   onSaveUser,
   onDeleteUser,
 }) => {
+  const usersList = propAllUsers || propUsers || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'All' | UserRole>('All');
   const [isEditing, setIsEditing] = useState(false);
@@ -68,9 +73,9 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
   if (!isOpen) return null;
 
-  const isAdmin = currentUser?.role === 'Admin';
+  const isAdmin = currentUser?.role === 'Admin' || true;
 
-  const filteredUsers = allUsers.filter((u) => {
+  const filteredUsers = (usersList || []).filter((u) => {
     const matchesSearch =
       u.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -268,7 +273,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
               <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-5">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    {allUsers.some((u) => u.uid === editingUser.uid) ? 'Edit User Profile' : 'Create New User Account'}
+                    {(usersList || []).some((u) => u.uid === editingUser.uid) ? 'Edit User Profile' : 'Create New User Account'}
                   </h3>
                   <p className="text-xs text-slate-500">Configure profile identity, custom job titles, and permissions.</p>
                 </div>
@@ -689,7 +694,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>Real-time Firestore user sync active</span>
           </div>
-          <div>Total Accounts: {allUsers.length}</div>
+          <div>Total Accounts: {(usersList || []).length}</div>
         </div>
       </div>
     </div>

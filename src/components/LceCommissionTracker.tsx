@@ -47,13 +47,17 @@ interface LceCommissionTrackerProps {
 }
 
 export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
-  records,
+  records = [],
   onSaveRecords,
   crmRecords = [],
   onCreateEngagementFromLce,
   onBackToDashboard,
   userRole = 'Admin',
 }) => {
+  const safeRecords = useMemo(
+    () => (Array.isArray(records) ? records : []),
+    [records]
+  );
   const isAdmin = userRole === 'Admin';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('ALL');
@@ -107,29 +111,29 @@ export const LceCommissionTracker: React.FC<LceCommissionTrackerProps> = ({
   // Unique lists for filters
   const uniqueMonths = useMemo(() => {
     const set = new Set<string>();
-    records.forEach((r) => {
+    safeRecords.forEach((r) => {
       if (r.month) set.add(r.month);
     });
     return Array.from(set);
-  }, [records]);
+  }, [safeRecords]);
 
   const uniqueCities = useMemo(() => {
     const set = new Set<string>();
-    records.forEach((r) => {
+    safeRecords.forEach((r) => {
       if (r.city) set.add(r.city.trim());
     });
     return Array.from(set).filter(Boolean);
-  }, [records]);
+  }, [safeRecords]);
 
   // Currently active selected beneficiary object
   const activeBeneficiary = useMemo(() => {
     if (selectedBeneficiaryId === 'ALL') return null;
-    return beneficiaries.find((b) => b.id === selectedBeneficiaryId) || null;
+    return (beneficiaries || []).find((b) => b.id === selectedBeneficiaryId) || null;
   }, [selectedBeneficiaryId, beneficiaries]);
 
   // Filtered list
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
+    return safeRecords.filter((r) => {
       if (selectedMonth !== 'ALL' && r.month !== selectedMonth) return false;
       if (selectedStatus !== 'ALL' && r.paymentStatus !== selectedStatus) return false;
       if (selectedCity !== 'ALL' && r.city.trim() !== selectedCity) return false;

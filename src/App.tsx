@@ -927,7 +927,9 @@ export default function App() {
       <AdminUserManagementModal
         isOpen={isAdminUserModalOpen}
         onClose={() => setIsAdminUserModalOpen(false)}
+        allUsers={allUsers}
         users={allUsers}
+        currentUser={currentUser}
         currentUserId={currentUser?.uid || ''}
         onSaveUser={handleSaveUser}
         onDeleteUser={handleDeleteUser}

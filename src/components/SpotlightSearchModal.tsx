@@ -49,8 +49,8 @@ interface SpotlightItem {
 export const SpotlightSearchModal: React.FC<SpotlightSearchModalProps> = ({
   isOpen,
   onClose,
-  engagements,
-  templates,
+  engagements = [],
+  templates = [],
   firmProfile,
   onSelectEngagement,
   onNewEngagement,
@@ -94,6 +94,8 @@ export const SpotlightSearchModal: React.FC<SpotlightSearchModalProps> = ({
   const filteredItems = useMemo<SpotlightItem[]>(() => {
     const q = query.trim().toLowerCase();
     const items: SpotlightItem[] = [];
+    const safeEngagements = Array.isArray(engagements) ? engagements : [];
+    const safeTemplates = Array.isArray(templates) ? templates : [];
 
     // 1. Quick System Actions (Always present or filtered)
     const quickActions: SpotlightItem[] = [
@@ -140,7 +142,7 @@ export const SpotlightSearchModal: React.FC<SpotlightSearchModalProps> = ({
 
     if (!q) {
       // When empty: show recent engagements & quick actions
-      engagements.slice(0, 5).forEach((rec) => {
+      safeEngagements.slice(0, 5).forEach((rec) => {
         const clientName = rec.client.companyName || rec.client.addresseeName;
         const totalFee = (rec.services && rec.services.length > 0)
           ? rec.services.reduce((acc, s) => acc + (s.pricing?.feeAmount || 0), 0)
@@ -173,7 +175,7 @@ export const SpotlightSearchModal: React.FC<SpotlightSearchModalProps> = ({
     }
 
     // Matching Engagements
-    engagements.forEach((rec) => {
+    safeEngagements.forEach((rec) => {
       const clientName = rec.client.companyName || rec.client.addresseeName;
       const refMatch = rec.refNo.toLowerCase().includes(q);
       const clientMatch = clientName.toLowerCase().includes(q);
@@ -209,7 +211,7 @@ export const SpotlightSearchModal: React.FC<SpotlightSearchModalProps> = ({
     });
 
     // Matching Pro-Forma Invoices
-    engagements.forEach((rec) => {
+    safeEngagements.forEach((rec) => {
       if (rec.invoiceNo && rec.invoiceNo.toLowerCase().includes(q)) {
         items.push({
           id: `inv-${rec.id}`,
@@ -228,7 +230,7 @@ export const SpotlightSearchModal: React.FC<SpotlightSearchModalProps> = ({
     });
 
     // Matching Services & Conditions Templates
-    (templates || []).forEach((tmpl) => {
+    safeTemplates.forEach((tmpl) => {
       if (!tmpl) return;
       const sCode = tmpl.serviceCode || '';
       const sTitle = tmpl.serviceTitle || '';

@@ -30,8 +30,8 @@ interface NewEngagementModalProps {
 export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
   isOpen,
   onClose,
-  templates,
-  existingEngagements,
+  templates = [],
+  existingEngagements = [],
   onCreateEngagement,
 }) => {
   // Multiselect state: initialize with the first template selected
@@ -95,17 +95,17 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
   };
 
   const selectAll = () => {
-    setSelectedTemplateIds(templates.map((t) => t.id));
+    setSelectedTemplateIds((templates || []).map((t) => t.id));
   };
 
   const selectFirstOnly = () => {
-    if (templates.length > 0) {
+    if (templates && templates.length > 0) {
       setSelectedTemplateIds([templates[0].id]);
     }
   };
 
   // Selected templates list & aggregate fee
-  const selectedTemplates = templates.filter((t) => selectedTemplateIds.includes(t.id));
+  const selectedTemplates = (templates || []).filter((t) => selectedTemplateIds.includes(t.id));
   const aggregateFee = selectedTemplates.reduce(
     (sum, t) => sum + (t.pricing?.feeAmount || 0),
     0

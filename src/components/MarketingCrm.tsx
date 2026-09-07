@@ -105,11 +105,11 @@ const STAGE_PROGRESSION: CrmAssignmentStatus[] = [
 ];
 
 export const MarketingCrm: React.FC<MarketingCrmProps> = ({
-  crmRecords,
+  crmRecords = [],
   onSaveCrmRecords,
-  engagements,
+  engagements = [],
   firmProfile,
-  availableTemplates,
+  availableTemplates = [],
   onOpenEngagementEditor,
   onCreateEngagementFromCrm,
   onNavigateToDashboard,
@@ -119,6 +119,10 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
   trashCount = 0,
   userRole = 'Admin',
 }) => {
+  const safeCrmRecords = useMemo(
+    () => (Array.isArray(crmRecords) ? crmRecords : []),
+    [crmRecords]
+  );
   const isAdmin = userRole === 'Admin';
   // Navigation & Views
   const [activeView, setActiveView] = useState<'table' | 'kanban' | 'analytics'>('table');
@@ -192,7 +196,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
 
   // Filtered & Sorted Records
   const filteredRecords = useMemo(() => {
-    return crmRecords
+    return safeCrmRecords
       .filter((rec) => {
         // Quick Saved Views Logic
         if (quickViewPill === 'advance_pending') {
