@@ -151,6 +151,8 @@ export interface FirmProfile {
   logoPosition?: 'left' | 'right';
   themeSettings?: ThemeSettings;
   wordDocConfig?: WordDocConfig;
+  loginBackgroundUrl?: string; // Custom or preset wallpaper for Apple macOS style login screen
+  loginBackgroundType?: 'preset' | 'custom';
 }
 
 export interface WordDocConfig {
@@ -447,6 +449,27 @@ export interface AppUser {
   updatedAt?: string;
   lastLoginAt?: string;
   isFirstAdmin?: boolean;
+  loginId?: string; // e.g. '123' or custom user ID
+  password?: string; // e.g. '123' or custom password
+  restrictedItems?: string[]; // specific items or info this person cannot see
+}
+
+export interface AuthLogEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  role: UserRole;
+  action:
+    | 'LOG_IN'
+    | 'LOG_OUT'
+    | 'PASSWORD_CHANGED'
+    | 'USER_CREATED'
+    | 'USER_UPDATED'
+    | 'USER_DELETED'
+    | 'RESTRICTION_UPDATED';
+  timestamp: string; // ISO string
+  details?: string;
+  ipAddress?: string;
 }
 
 

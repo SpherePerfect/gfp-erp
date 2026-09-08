@@ -42,6 +42,29 @@ export const COLLECTIONS = {
 } as const;
 
 /**
+ * Recursively strips out keys with `undefined` values from an object,
+ * preventing Firestore's "Unsupported field value: undefined" errors.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as any;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirestore(item)) as any;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
+
+/**
  * System Initialization Guard:
  * Ensures default sample records are only seeded ONCE during initial database setup,
  * and prevents deleted documents from being accidentally resurrected when collections are emptied.
@@ -86,7 +109,7 @@ export function subscribeToUsers(
             const batch = writeBatch(db);
             initialSeed.forEach((u) => {
               const ref = doc(db, COLLECTIONS.USERS, u.uid);
-              batch.set(ref, u);
+              batch.set(ref, sanitizeForFirestore(u));
             });
             await batch.commit();
           } catch (err) {
@@ -380,7 +403,7 @@ export function subscribeToTrash(
 export async function saveEngagementDoc(engagement: EngagementRecord): Promise<void> {
   const path = `${COLLECTIONS.ENGAGEMENTS}/${engagement.id}`;
   try {
-    await setDoc(doc(db, COLLECTIONS.ENGAGEMENTS, engagement.id), engagement);
+    await setDoc(doc(db, COLLECTIONS.ENGAGEMENTS, engagement.id), sanitizeForFirestore(engagement));
   } catch (error) {
     console.error('saveEngagementDoc error:', error);
   }
@@ -398,7 +421,7 @@ export async function deleteEngagementDoc(engagementId: string): Promise<void> {
 export async function saveCrmRecordDoc(record: CrmClientRecord): Promise<void> {
   const path = `${COLLECTIONS.CRM_RECORDS}/${record.id}`;
   try {
-    await setDoc(doc(db, COLLECTIONS.CRM_RECORDS, record.id), record);
+    await setDoc(doc(db, COLLECTIONS.CRM_RECORDS, record.id), sanitizeForFirestore(record));
   } catch (error) {
     console.error('saveCrmRecordDoc error:', error);
   }
@@ -416,7 +439,7 @@ export async function deleteCrmRecordDoc(recordId: string): Promise<void> {
 export async function saveLceRecordDoc(record: LceRecord): Promise<void> {
   const path = `${COLLECTIONS.LCE_RECORDS}/${record.id}`;
   try {
-    await setDoc(doc(db, COLLECTIONS.LCE_RECORDS, record.id), record);
+    await setDoc(doc(db, COLLECTIONS.LCE_RECORDS, record.id), sanitizeForFirestore(record));
   } catch (error) {
     console.error('saveLceRecordDoc error:', error);
   }
@@ -434,7 +457,7 @@ export async function deleteLceRecordDoc(recordId: string): Promise<void> {
 export async function saveTemplateDoc(template: ServiceTemplate): Promise<void> {
   const path = `${COLLECTIONS.TEMPLATES}/${template.id}`;
   try {
-    await setDoc(doc(db, COLLECTIONS.TEMPLATES, template.id), template);
+    await setDoc(doc(db, COLLECTIONS.TEMPLATES, template.id), sanitizeForFirestore(template));
   } catch (error) {
     console.error('saveTemplateDoc error:', error);
   }
@@ -452,7 +475,7 @@ export async function deleteTemplateDoc(templateId: string): Promise<void> {
 export async function saveFirmProfileDoc(profile: FirmProfile): Promise<void> {
   const path = `${COLLECTIONS.FIRM_PROFILE}/default`;
   try {
-    await setDoc(doc(db, COLLECTIONS.FIRM_PROFILE, 'default'), profile);
+    await setDoc(doc(db, COLLECTIONS.FIRM_PROFILE, 'default'), sanitizeForFirestore(profile));
   } catch (error) {
     console.error('saveFirmProfileDoc error:', error);
   }
@@ -461,7 +484,7 @@ export async function saveFirmProfileDoc(profile: FirmProfile): Promise<void> {
 export async function saveTaxonomyDoc(taxonomy: CustomTaxonomyConfig): Promise<void> {
   const path = `${COLLECTIONS.TAXONOMY}/default`;
   try {
-    await setDoc(doc(db, COLLECTIONS.TAXONOMY, 'default'), taxonomy);
+    await setDoc(doc(db, COLLECTIONS.TAXONOMY, 'default'), sanitizeForFirestore(taxonomy));
   } catch (error) {
     console.error('saveTaxonomyDoc error:', error);
   }
@@ -470,7 +493,7 @@ export async function saveTaxonomyDoc(taxonomy: CustomTaxonomyConfig): Promise<v
 export async function saveTrashDoc(item: TrashItem): Promise<void> {
   const path = `${COLLECTIONS.TRASH}/${item.id}`;
   try {
-    await setDoc(doc(db, COLLECTIONS.TRASH, item.id), item);
+    await setDoc(doc(db, COLLECTIONS.TRASH, item.id), sanitizeForFirestore(item));
   } catch (error) {
     console.error('saveTrashDoc error:', error);
   }
@@ -488,11 +511,12 @@ export async function deleteTrashDoc(itemId: string): Promise<void> {
 export async function saveUserDoc(user: AppUser): Promise<void> {
   const path = `${COLLECTIONS.USERS}/${user.uid}`;
   try {
-    await setDoc(doc(db, COLLECTIONS.USERS, user.uid), user);
+    const cleanedUser = sanitizeForFirestore(user);
+    await setDoc(doc(db, COLLECTIONS.USERS, user.uid), cleanedUser);
     if (user.role === 'Admin') {
       await setDoc(doc(db, 'admins', user.uid), {
         uid: user.uid,
-        email: user.email,
+        email: user.email || '',
         assignedAt: new Date().toISOString(),
       });
     } else {

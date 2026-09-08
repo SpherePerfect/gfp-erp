@@ -29,9 +29,13 @@ import {
   ArrowRight,
   ArrowLeft,
   Filter,
+  Database,
 } from 'lucide-react';
 import { FirmProfile, SignatoryDetails, ThemeSettings } from '../types';
 import { INDIAN_STATES } from '../data/defaultFirmProfile';
+import { LoginWallpaperSettingsTab } from './LoginWallpaperSettingsTab';
+import { FirebaseTelemetryTab } from './FirebaseTelemetryTab';
+import { DEFAULT_WALLPAPER } from '../data/presetWallpapers';
 
 interface FirmSettingsModalProps {
   isOpen: boolean;
@@ -39,7 +43,7 @@ interface FirmSettingsModalProps {
   firmProfile: FirmProfile;
   onSave: (updated: FirmProfile) => void;
   onOpenTaxonomy?: () => void;
-  initialTab?: 'firm' | 'theme' | 'signatories' | 'bank' | 'guide';
+  initialTab?: 'firm' | 'theme' | 'signatories' | 'bank' | 'login_wallpaper' | 'firebase_telemetry' | 'guide';
 }
 
 export const FirmSettingsModal: React.FC<FirmSettingsModalProps> = ({
@@ -75,7 +79,7 @@ export const FirmSettingsModal: React.FC<FirmSettingsModalProps> = ({
     logoWidthPx: firmProfile.logoWidthPx || 180,
   }));
 
-  const [activeTab, setActiveTab] = useState<'firm' | 'theme' | 'signatories' | 'bank' | 'guide'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'firm' | 'theme' | 'signatories' | 'bank' | 'login_wallpaper' | 'firebase_telemetry' | 'guide'>(initialTab);
   const [guideSearchQuery, setGuideSearchQuery] = useState('');
   const [guideCategory, setGuideCategory] = useState<string>('all');
 
@@ -302,6 +306,8 @@ export const FirmSettingsModal: React.FC<FirmSettingsModalProps> = ({
                     { id: 'signatories', label: `Signatories (${profile.signatories?.length || 1})`, sublabel: 'Partners & Authorities', icon: UserCheck, grad: 'from-emerald-500 to-teal-600' },
                     { id: 'firm', label: 'Firm & Tax Information', sublabel: 'PAN, GSTIN & MSME', icon: Building2, grad: 'from-blue-500 to-sky-600' },
                     { id: 'bank', label: 'Banking & Contacts', sublabel: 'Bank A/C, UPI & Offices', icon: Landmark, grad: 'from-amber-500 to-orange-600' },
+                    { id: 'login_wallpaper', label: 'Login Screen Wallpaper', sublabel: 'macOS Lockscreen Background', icon: ImageIcon, grad: 'from-pink-500 to-rose-600' },
+                    { id: 'firebase_telemetry', label: 'Firebase Cloud Telemetry', sublabel: 'Usage, quotas & latency', icon: Database, grad: 'from-amber-500 to-red-500' },
                     { id: 'guide', label: 'Button & Feature Guide', sublabel: 'User manual & operations', icon: BookOpen, grad: 'from-indigo-600 to-blue-700' },
                   ].map((tab) => {
                     const Icon = tab.icon;
@@ -1364,6 +1370,32 @@ export const FirmSettingsModal: React.FC<FirmSettingsModalProps> = ({
             </div>
           )}
 
+                    {/* TAB: LOGIN SCREEN WALLPAPER */}
+                    {activeTab === 'login_wallpaper' && (
+                      <LoginWallpaperSettingsTab
+                        currentWallpaperUrl={profile.loginBackgroundUrl || DEFAULT_WALLPAPER}
+                        currentWallpaperType={profile.loginBackgroundType || 'preset'}
+                        onSelectWallpaper={(url, type) => {
+                          setProfile((prev) => ({
+                            ...prev,
+                            loginBackgroundUrl: url,
+                            loginBackgroundType: type,
+                          }));
+                        }}
+                        onResetToDefault={() => {
+                          setProfile((prev) => ({
+                            ...prev,
+                            loginBackgroundUrl: DEFAULT_WALLPAPER,
+                            loginBackgroundType: 'preset',
+                          }));
+                        }}
+                      />
+                    )}
+
+                    {/* TAB: FIREBASE TELEMETRY */}
+                    {activeTab === 'firebase_telemetry' && (
+                      <FirebaseTelemetryTab />
+                    )}
                   </div>
 
                   {/* macOS Window Bottom Action Bar */}

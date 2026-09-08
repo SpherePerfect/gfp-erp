@@ -49,10 +49,13 @@ import {
   ServiceTemplate,
   CustomTaxonomyConfig,
   UserRole,
+  AppUser,
 } from '../types';
 import { CrmRecordModal } from './CrmRecordModal';
 import { CrmActivityTimeline } from './CrmActivityTimeline';
 import { RestrictedCell } from './RestrictedCell';
+import { CrmAnalyticsDashboard } from './CrmAnalyticsDashboard';
+import { canSee } from '../utils/permissions';
 import {
   exportCrmRecordsToCsv,
   syncEngagementsWithCrm,
@@ -76,6 +79,7 @@ interface MarketingCrmProps {
   onOpenTrash?: () => void;
   trashCount?: number;
   userRole?: UserRole;
+  currentUser?: AppUser | null;
 }
 
 const ALL_STAGES: CrmAssignmentStatus[] = [
@@ -118,12 +122,22 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
   onOpenTrash,
   trashCount = 0,
   userRole = 'Admin',
+  currentUser,
 }) => {
   const safeCrmRecords = useMemo(
     () => (Array.isArray(crmRecords) ? crmRecords : []),
     [crmRecords]
   );
   const isAdmin = userRole === 'Admin';
+  const canSeeCommercials = canSee(currentUser, 'commercial_values', userRole);
+  const canSeeRevenue = canSee(currentUser, 'kpi_revenue', userRole);
+  const canDeleteRecords =
+    canSee(currentUser, 'action_delete', userRole) &&
+    canSee(currentUser, 'action_delete_crm', userRole);
+  const canExportRecords = canSee(currentUser, 'action_export', userRole);
+  const canCreateLead = canSee(currentUser, 'action_create_crm_lead', userRole);
+  const canCreateEngagement = canSee(currentUser, 'action_create_engagement', userRole);
+  const canEditLead = canSee(currentUser, 'action_edit_crm', userRole);
   // Navigation & Views
   const [activeView, setActiveView] = useState<'table' | 'kanban' | 'analytics'>('table');
   const [quickViewPill, setQuickViewPill] = useState<
@@ -579,6 +593,14 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
       onOpenEngagementEditor(matched);
       showToast(`Opened Engagement Letter: ${matched.refNo}`);
     } else {
+      if (!canCreateEngagement) {
+        dispatchToast({
+          type: 'warning',
+          title: 'Access Restricted',
+          message: 'Your account is restricted from drafting or generating new Engagement Letters.',
+        });
+        return;
+      }
       onCreateEngagementFromCrm(record);
       showToast(`Created draft Engagement Letter for ${record.clientName}`);
     }
@@ -859,27 +881,31 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Sync Engagements
           </button>
 
-          <button
-            type="button"
-            onClick={() => exportCrmRecordsToCsv(crmRecords)}
-            className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs transition-colors flex items-center gap-1.5"
-            title="Download full 34-column spreadsheet in CSV format"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            Export CSV
-          </button>
+          {canExportRecords && (
+            <button
+              type="button"
+              onClick={() => exportCrmRecordsToCsv(crmRecords)}
+              className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs transition-colors flex items-center gap-1.5"
+              title="Download full 34-column spreadsheet in CSV format"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              Export CSV
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setEditingRecord(null);
-              setIsModalOpen(true);
-            }}
-            className="px-4 py-2 text-xs font-bold text-white bg-[#0B2545] hover:bg-[#133E6D] shadow-xs transition-colors flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            + Create Deal / Lead
-          </button>
+          {canCreateLead && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingRecord(null);
+                setIsModalOpen(true);
+              }}
+              className="px-4 py-2 text-xs font-bold text-white bg-[#0B2545] hover:bg-[#133E6D] shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              + Create Deal / Lead
+            </button>
+          )}
         </div>
       </div>
 
@@ -890,7 +916,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Total Pipeline
           </div>
           <div className="text-lg font-black font-mono text-slate-900 mt-0.5 truncate">
-            {isAdmin ? formatINR(metrics.totalPipelineValue) : '🚫 Restricted'}
+            {canSeeRevenue ? formatINR(metrics.totalPipelineValue) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-slate-500 mt-1 font-medium">Across all active mandates</div>
         </div>
@@ -900,7 +926,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Advance Realized
           </div>
           <div className="text-lg font-black font-mono text-emerald-700 mt-0.5 truncate">
-            {isAdmin ? formatINR(metrics.totalAdvanceCollected) : '🚫 Restricted'}
+            {canSeeCommercials ? formatINR(metrics.totalAdvanceCollected) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-emerald-700 mt-1 font-medium">Collected in bank</div>
         </div>
@@ -910,7 +936,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Advance Pending
           </div>
           <div className="text-lg font-black font-mono text-rose-700 mt-0.5 truncate">
-            {isAdmin ? formatINR(metrics.totalAdvancePending) : '🚫 Restricted'}
+            {canSeeCommercials ? formatINR(metrics.totalAdvancePending) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-rose-700 mt-1 font-medium">Follow-up needed</div>
         </div>
@@ -920,7 +946,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             Post-Delivery Due
           </div>
           <div className="text-lg font-black font-mono text-indigo-950 mt-0.5 truncate">
-            {isAdmin ? formatINR(metrics.totalPostDeliveryCommercial) : '🚫 Restricted'}
+            {canSeeCommercials ? formatINR(metrics.totalPostDeliveryCommercial) : '🚫 Restricted'}
           </div>
           <div className="text-[10px] text-slate-500 mt-1 font-medium">Payable on report delivery</div>
         </div>
@@ -1463,12 +1489,12 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
 
                         {/* Commercials: Total */}
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                          {isAdmin ? formatINR(rec.totalCommercial) : <RestrictedCell compact />}
+                          {canSeeCommercials ? formatINR(rec.totalCommercial) : <RestrictedCell compact />}
                         </td>
 
                         {/* Advance Amount */}
                         <td className="py-2.5 px-3 text-right font-mono text-slate-800 whitespace-nowrap">
-                          {isAdmin ? formatINR(rec.advanceAmount) : <RestrictedCell compact />}
+                          {canSeeCommercials ? formatINR(rec.advanceAmount) : <RestrictedCell compact />}
                         </td>
 
                         {/* Advance Status with 1-Click Dropdown */}
@@ -1493,7 +1519,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
 
                         {/* Post-Delivery Balance (Automated) */}
                         <td className="py-2.5 px-3 text-right font-mono text-indigo-950 font-bold whitespace-nowrap bg-indigo-50/20">
-                          {isAdmin ? formatINR(postDeliv) : <RestrictedCell compact />}
+                          {canSeeCommercials ? formatINR(postDeliv) : <RestrictedCell compact />}
                         </td>
 
                         {/* Engagement Letter Reference / 1-Click Draft */}
@@ -1554,7 +1580,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
                             <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{rec.elStartDate || '-'}</td>
                             <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{rec.reportDeliveryDate || '-'}</td>
                             <td className="py-2.5 px-3 font-mono font-semibold text-right whitespace-nowrap">
-                              {isAdmin ? formatINR(rec.invoiceValue) : <RestrictedCell compact />}
+                              {canSeeCommercials ? formatINR(rec.invoiceValue) : <RestrictedCell compact />}
                             </td>
                             <td className="py-2.5 px-3 text-indigo-900 font-medium truncate max-w-[160px]">{rec.postCompletionPotential}</td>
                             <td className="py-2.5 px-3 font-semibold text-slate-800 whitespace-nowrap">{rec.finalStatus}</td>
@@ -1586,14 +1612,16 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
                               Edit
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmTarget({ type: 'single', record: rec })}
-                              className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors"
-                              title="Delete Lead Record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canDeleteRecords && (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmTarget({ type: 'single', record: rec })}
+                                className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors"
+                                title="Delete Lead Record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1611,7 +1639,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
             </div>
             <div className="flex items-center gap-4 font-mono text-[11px]">
               <span>
-                Filtered Pipeline: <strong className="text-slate-900">{formatINR(filteredRecords.reduce((acc, r) => acc + (r.totalCommercial || 0), 0))}</strong>
+                Filtered Pipeline: <strong className="text-slate-900">{canSeeRevenue ? formatINR(filteredRecords.reduce((acc, r) => acc + (r.totalCommercial || 0), 0)) : '🚫 Restricted'}</strong>
               </span>
             </div>
           </div>
@@ -1716,7 +1744,7 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
                           )}
 
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                            {isAdmin ? (
+                            {canSeeCommercials ? (
                               <>
                                 <span className="font-mono font-bold text-slate-900">
                                   {formatINR(r.totalCommercial)}
@@ -1838,98 +1866,12 @@ export const MarketingCrm: React.FC<MarketingCrmProps> = ({
       {/* VIEW 3: MARKETING & DEAL ANALYTICS */}
       {activeView === 'analytics' && (
         <div className="space-y-4 animate-view-in">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Chart 1: Revenue by Deliverable */}
-            <div className="bg-white border border-slate-200 p-5 shadow-2xs space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <BarChart3 className="w-4 h-4 text-indigo-600" />
-                Pipeline by Deliverable Scope
-              </h3>
-              <div className="space-y-2.5 text-xs">
-                {Array.from(new Set(crmRecords.map((r) => r.natureOfDeliverable))).map((d) => {
-                  const items = crmRecords.filter((r) => r.natureOfDeliverable === d);
-                  const val = items.reduce((acc, r) => acc + (r.totalCommercial || 0), 0);
-                  const pct =
-                    metrics.totalPipelineValue > 0
-                      ? Math.round((val / metrics.totalPipelineValue) * 100)
-                      : 0;
-                  return (
-                    <div key={d} className="space-y-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="font-semibold text-slate-800 truncate max-w-[180px]">{d}</span>
-                        <span className="font-mono text-slate-600">{formatINR(val)} ({pct}%)</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-1.5 overflow-hidden">
-                        <div className="bg-indigo-600 h-full" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Chart 2: Lead Acquisition Source */}
-            <div className="bg-white border border-slate-200 p-5 shadow-2xs space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
-                Acquisition Sources Performance
-              </h3>
-              <div className="space-y-2.5 text-xs">
-                {Array.from(new Set(crmRecords.map((r) => r.leadGeneratedBy))).map((src) => {
-                  const items = crmRecords.filter((r) => r.leadGeneratedBy === src);
-                  const val = items.reduce((acc, r) => acc + (r.totalCommercial || 0), 0);
-                  const pct =
-                    metrics.totalPipelineValue > 0
-                      ? Math.round((val / metrics.totalPipelineValue) * 100)
-                      : 0;
-                  return (
-                    <div key={src} className="space-y-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="font-semibold text-slate-800 truncate max-w-[180px]">{src}</span>
-                        <span className="font-mono text-slate-600">{items.length} leads • {formatINR(val)}</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-1.5 overflow-hidden">
-                        <div className="bg-emerald-600 h-full" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Chart 3: Collection Efficiency */}
-            <div className="bg-white border border-slate-200 p-5 shadow-2xs space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-blue-600" />
-                Receivables & Cash Flow Split
-              </h3>
-              <div className="space-y-3 text-xs pt-2">
-                <div className="bg-emerald-50 border border-emerald-200 p-3">
-                  <div className="text-[11px] font-bold text-emerald-900 uppercase">Advance Realized</div>
-                  <div className="text-base font-bold font-mono text-emerald-800 mt-0.5">
-                    {formatINR(metrics.totalAdvanceCollected)}
-                  </div>
-                  <div className="text-[10px] text-emerald-700 mt-1">Deposited into firm / personal account</div>
-                </div>
-
-                <div className="bg-amber-50 border border-amber-200 p-3">
-                  <div className="text-[11px] font-bold text-amber-900 uppercase">Advance Pending Collection</div>
-                  <div className="text-base font-bold font-mono text-amber-800 mt-0.5">
-                    {formatINR(metrics.totalAdvancePending)}
-                  </div>
-                  <div className="text-[10px] text-amber-700 mt-1">Follow-up needed before initiating draft work</div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 p-3">
-                  <div className="text-[11px] font-bold text-slate-700 uppercase">Post-Delivery Balance Receivable</div>
-                  <div className="text-base font-bold font-mono text-indigo-950 mt-0.5">
-                    {formatINR(metrics.totalPostDeliveryCommercial)}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-1">Payable on delivery of valuation/model report</div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <CrmAnalyticsDashboard
+            crmRecords={filteredRecords}
+            canSeeCommercials={canSeeCommercials}
+            formatINR={formatINR}
+            onSelectRecord={(r) => setInspectingRecord(r)}
+          />
         </div>
       )}
 

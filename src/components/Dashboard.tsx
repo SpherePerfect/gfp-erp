@@ -22,12 +22,13 @@ import {
   MoreVertical,
   AlertTriangle,
 } from 'lucide-react';
-import { EngagementRecord, EngagementStatus, FirmProfile, UserRole } from '../types';
+import { EngagementRecord, EngagementStatus, FirmProfile, UserRole, AppUser } from '../types';
 import { formatIndianCurrency } from '../utils/numberToIndianWords';
 import { downloadEngagementLetter, downloadProFormaInvoice } from '../utils/docxExport';
 import { downloadBothDocxZip } from '../utils/zipExport';
 import { KpiCard } from './KpiCard';
 import { RestrictedCell } from './RestrictedCell';
+import { canSee } from '../utils/permissions';
 
 interface DashboardProps {
   engagements: EngagementRecord[];
@@ -43,6 +44,7 @@ interface DashboardProps {
   globalSearchQuery?: string;
   onGlobalSearchChange?: (q: string) => void;
   userRole?: UserRole;
+  currentUser?: AppUser | null;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -59,12 +61,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   globalSearchQuery = '',
   onGlobalSearchChange,
   userRole = 'Admin',
+  currentUser,
 }) => {
   const safeEngagements = useMemo(
     () => (Array.isArray(engagements) ? engagements : []),
     [engagements]
   );
   const isAdmin = userRole === 'Admin';
+  const canSeeCommercials = canSee(currentUser, 'commercial_values', userRole);
+  const canSeeRevenue = canSee(currentUser, 'kpi_revenue', userRole);
+  const canDeleteRecords = canSee(currentUser, 'action_delete', userRole);
+  const canExportRecords = canSee(currentUser, 'action_export', userRole);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [issuerFilter, setIssuerFilter] = useState<'all' | 'firm' | 'personal'>('all');
@@ -354,19 +361,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             iconBg="bg-blue-50"
             currentMonthLabel={monthMetrics.currentMonthLabel}
             prevMonthLabel={monthMetrics.prevMonthLabel}
-            currentValue={isAdmin ? formatIndianCurrency(monthMetrics.current.value) : '🚫 Restricted'}
-            prevValue={isAdmin ? formatIndianCurrency(monthMetrics.prev.value) : '🚫 Restricted'}
-            currentSubtitle={isAdmin ? "Aggregate fee value across mandates" : "Restricted: Admin clearance required"}
+            currentValue={canSeeRevenue ? formatIndianCurrency(monthMetrics.current.value) : '🚫 Restricted'}
+            prevValue={canSeeRevenue ? formatIndianCurrency(monthMetrics.prev.value) : '🚫 Restricted'}
+            currentSubtitle={canSeeRevenue ? "Aggregate fee value across mandates" : "Restricted: Admin clearance required"}
             prevSubtitle={
-              !isAdmin
+              !canSeeRevenue
                 ? "Restricted: Admin clearance required"
                 : monthMetrics.prev.value === 0
                 ? 'No prior billings recorded'
                 : 'Prior month closed contract volume'
             }
-            deltaText={isAdmin ? (monthMetrics.current.value >= monthMetrics.prev.value ? '+ Growth' : 'Baseline') : 'Restricted'}
+            deltaText={canSeeRevenue ? (monthMetrics.current.value >= monthMetrics.prev.value ? '+ Growth' : 'Baseline') : 'Restricted'}
             deltaType={monthMetrics.current.value >= monthMetrics.prev.value ? 'positive' : 'neutral'}
-            interactiveTooltip={isAdmin ? `Total portfolio volume for ${monthMetrics.currentMonthLabel}` : 'Restricted: Financial commercials require Admin clearance'}
+            interactiveTooltip={canSeeRevenue ? `Total portfolio volume for ${monthMetrics.currentMonthLabel}` : 'Restricted: Financial commercials require Admin clearance'}
           />
 
           <KpiCard
@@ -377,19 +384,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             iconBg="bg-emerald-50"
             currentMonthLabel={monthMetrics.currentMonthLabel}
             prevMonthLabel={monthMetrics.prevMonthLabel}
-            currentValue={isAdmin ? formatIndianCurrency(monthMetrics.current.advance) : '🚫 Restricted'}
-            prevValue={isAdmin ? formatIndianCurrency(monthMetrics.prev.advance) : '🚫 Restricted'}
-            currentSubtitle={isAdmin ? "Target 50% milestone billing" : "Restricted: Admin clearance required"}
+            currentValue={canSeeCommercials ? formatIndianCurrency(monthMetrics.current.advance) : '🚫 Restricted'}
+            prevValue={canSeeCommercials ? formatIndianCurrency(monthMetrics.prev.advance) : '🚫 Restricted'}
+            currentSubtitle={canSeeCommercials ? "Target 50% milestone billing" : "Restricted: Admin clearance required"}
             prevSubtitle={
-              !isAdmin
+              !canSeeCommercials
                 ? "Restricted: Admin clearance required"
                 : monthMetrics.prev.advance === 0
                 ? 'No advance billing recorded'
                 : 'Past month advance billing'
             }
-            deltaText={isAdmin ? "50% Target" : "Restricted"}
+            deltaText={canSeeCommercials ? "50% Target" : "Restricted"}
             deltaType="positive"
-            interactiveTooltip={isAdmin ? `Mobilization cashflow receivable: ${formatIndianCurrency(monthMetrics.current.advance)}` : 'Restricted: Financial commercials require Admin clearance'}
+            interactiveTooltip={canSeeCommercials ? `Mobilization cashflow receivable: ${formatIndianCurrency(monthMetrics.current.advance)}` : 'Restricted: Financial commercials require Admin clearance'}
           />
 
           <KpiCard
@@ -609,7 +616,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                           {/* Fee & Advance */}
                           <td className="py-0.5 px-2.5 text-right whitespace-nowrap font-mono">
-                            {isAdmin ? (
+                            {canSeeCommercials ? (
                               <>
                                 <span className="font-bold text-slate-900 text-[11.5px]">
                                   {formatIndianCurrency(rec.service.pricing.feeAmount)}
@@ -639,33 +646,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               >
                                 <Edit2 className="w-3.5 h-3.5 btn-icon-edit" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadLetter(rec)}
-                                disabled={downloadingId === `${rec.id}-letter`}
-                                className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-none btn-interactive disabled:opacity-40"
-                                title="Download Word Letter (.docx)"
-                              >
-                                <FileText className="w-3.5 h-3.5 btn-icon-hover" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadInvoice(rec)}
-                                disabled={downloadingId === `${rec.id}-inv`}
-                                className="p-1 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-none btn-interactive disabled:opacity-40"
-                                title="Download Word Invoice (.docx)"
-                              >
-                                <Receipt className="w-3.5 h-3.5 btn-icon-hover" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadZip(rec)}
-                                disabled={downloadingId === `${rec.id}-zip`}
-                                className="p-1 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-none btn-interactive disabled:opacity-40"
-                                title="Download Both (ZIP)"
-                              >
-                                <Archive className="w-3.5 h-3.5 btn-icon-hover" />
-                              </button>
+                              {canExportRecords && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadLetter(rec)}
+                                    disabled={downloadingId === `${rec.id}-letter`}
+                                    className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-none btn-interactive disabled:opacity-40"
+                                    title="Download Word Letter (.docx)"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 btn-icon-hover" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadInvoice(rec)}
+                                    disabled={downloadingId === `${rec.id}-inv`}
+                                    className="p-1 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-none btn-interactive disabled:opacity-40"
+                                    title="Download Word Invoice (.docx)"
+                                  >
+                                    <Receipt className="w-3.5 h-3.5 btn-icon-hover" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadZip(rec)}
+                                    disabled={downloadingId === `${rec.id}-zip`}
+                                    className="p-1 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-none btn-interactive disabled:opacity-40"
+                                    title="Download Both (ZIP)"
+                                  >
+                                    <Archive className="w-3.5 h-3.5 btn-icon-hover" />
+                                  </button>
+                                </>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => onDuplicateEngagement(rec)}
@@ -674,14 +685,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               >
                                 <Copy className="w-3.5 h-3.5 btn-icon-hover" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setRecordToDelete(rec)}
-                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none btn-interactive"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 btn-icon-trash" />
-                              </button>
+                              {canDeleteRecords && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRecordToDelete(rec)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none btn-interactive"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 btn-icon-trash" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -755,7 +768,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                         {/* Fee Value */}
                         <td className={`${cellPadding} text-right whitespace-nowrap font-mono`}>
-                          {isAdmin ? (
+                          {canSeeCommercials ? (
                             <>
                               <div className="font-bold text-slate-900">
                                 {formatIndianCurrency(rec.service.pricing.feeAmount)}
@@ -787,38 +800,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               <Edit2 className="w-3.5 h-3.5 btn-icon-edit" />
                             </button>
 
-                            {/* Word Letter */}
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadLetter(rec)}
-                              disabled={downloadingId === `${rec.id}-letter`}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-none btn-interactive disabled:opacity-40"
-                              title="Download Word Engagement Letter (.docx)"
-                            >
-                              <FileText className="w-3.5 h-3.5 btn-icon-hover" />
-                            </button>
+                            {/* Export Actions (Word Letter, Invoice, ZIP) */}
+                            {canExportRecords && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadLetter(rec)}
+                                  disabled={downloadingId === `${rec.id}-letter`}
+                                  className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-none btn-interactive disabled:opacity-40"
+                                  title="Download Word Engagement Letter (.docx)"
+                                >
+                                  <FileText className="w-3.5 h-3.5 btn-icon-hover" />
+                                </button>
 
-                            {/* Word Invoice */}
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadInvoice(rec)}
-                              disabled={downloadingId === `${rec.id}-inv`}
-                              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/80 rounded-none btn-interactive disabled:opacity-40"
-                              title="Download Word Pro-Forma Invoice (.docx)"
-                            >
-                              <Receipt className="w-3.5 h-3.5 btn-icon-hover" />
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadInvoice(rec)}
+                                  disabled={downloadingId === `${rec.id}-inv`}
+                                  className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/80 rounded-none btn-interactive disabled:opacity-40"
+                                  title="Download Word Pro-Forma Invoice (.docx)"
+                                >
+                                  <Receipt className="w-3.5 h-3.5 btn-icon-hover" />
+                                </button>
 
-                            {/* Zip Both */}
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadZip(rec)}
-                              disabled={downloadingId === `${rec.id}-zip`}
-                              className="p-1.5 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50/80 rounded-none btn-interactive disabled:opacity-40"
-                              title="Download Both Documents (ZIP)"
-                            >
-                              <Archive className="w-3.5 h-3.5 btn-icon-hover" />
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadZip(rec)}
+                                  disabled={downloadingId === `${rec.id}-zip`}
+                                  className="p-1.5 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50/80 rounded-none btn-interactive disabled:opacity-40"
+                                  title="Download Both Documents (ZIP)"
+                                >
+                                  <Archive className="w-3.5 h-3.5 btn-icon-hover" />
+                                </button>
+                              </>
+                            )}
 
                             {/* Duplicate */}
                             <button
@@ -831,14 +846,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </button>
 
                             {/* Delete (Opens dedicated confirmation dialog, completely removing window.confirm block) */}
-                            <button
-                              type="button"
-                              onClick={() => setRecordToDelete(rec)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none btn-interactive"
-                              title="Delete Engagement Charter"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 btn-icon-trash" />
-                            </button>
+                            {canDeleteRecords && (
+                              <button
+                                type="button"
+                                onClick={() => setRecordToDelete(rec)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none btn-interactive"
+                                title="Delete Engagement Charter"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 btn-icon-trash" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

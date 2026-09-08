@@ -18,8 +18,10 @@ import {
   Check,
   Sparkles,
   Wifi,
+  KeyRound,
 } from 'lucide-react';
 import { FirmProfile, AppUser, UserRole } from '../types';
+import { canSee } from '../utils/permissions';
 
 interface NavbarProps {
   currentView: 'dashboard' | 'editor' | 'templates' | 'crm' | 'commission';
@@ -37,6 +39,7 @@ interface NavbarProps {
   // Auth & Admin additions
   currentUser: AppUser | null;
   onOpenAdminUserManagement: () => void;
+  onOpenChangeCredentials?: () => void;
   onSimulateRoleChange?: (role: UserRole) => void;
   simulatedRole?: UserRole;
   onSignIn?: () => void;
@@ -56,6 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   crmCount = 0,
   currentUser,
   onOpenAdminUserManagement,
+  onOpenChangeCredentials,
   onSimulateRoleChange,
   simulatedRole,
   onSignIn,
@@ -83,6 +87,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const activeRole = simulatedRole || currentUser?.role || 'Admin';
   const isAdmin = activeRole === 'Admin';
+
+  const canCreateEngagement = canSee(currentUser, 'action_create_engagement', activeRole);
+  const canSeeFirmSettings = canSee(currentUser, 'module_firm_settings', activeRole);
+  const canSeeTaxonomies = canSee(currentUser, 'module_taxonomies', activeRole);
+  const canSeeTrash = canSee(currentUser, 'module_trash', activeRole);
+  const canManageUsers = isAdmin && canSee(currentUser, 'admin_user_management', activeRole);
+  const canSeeCrm = canSee(currentUser, 'module_crm', activeRole);
+  const canSeeLce = canSee(currentUser, 'module_lce', activeRole);
+  const canSeeTemplates = canSee(currentUser, 'module_templates', activeRole);
+  const hasAnyTools = canSeeFirmSettings || canSeeTaxonomies || canSeeTrash;
 
   const userDisplayName = currentUser?.displayName || firmProfile.signatoryName || 'CA Yogesh Kulkarni';
   const initials = userDisplayName
@@ -124,18 +138,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-[9.5px] text-slate-500 font-medium">Advisory Suite</span>
             </div>
           </div>
-
-          {/* Vertical Divider */}
-          <div className="h-4 w-px bg-slate-200 hidden md:block" />
-
-          {/* Real-time sync status indicator */}
-          <div
-            className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10.5px] font-medium"
-            title="Real-Time Firestore Sync Active — changes sync instantly across all active screens"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold">Live Cloud</span>
-          </div>
         </div>
 
         {/* =========================================================================
@@ -160,58 +162,64 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* 2. Marketing CRM */}
-            <button
-              type="button"
-              onClick={() => onNavigate('crm')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 transition-all ${
-                currentView === 'crm'
-                  ? 'bg-white text-[#0B2545] shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-              }`}
-              title="Marketing CRM & Pipeline ERP"
-            >
-              <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-              <span>CRM</span>
-              {crmCount > 0 && (
-                <span
-                  className={`px-1 py-0.2 text-[9px] font-bold font-mono ${
-                    currentView === 'crm' ? 'bg-[#0B2545] text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {crmCount}
-                </span>
-              )}
-            </button>
+            {canSeeCrm && (
+              <button
+                type="button"
+                onClick={() => onNavigate('crm')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 transition-all ${
+                  currentView === 'crm'
+                    ? 'bg-white text-[#0B2545] shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+                title="Marketing CRM & Pipeline ERP"
+              >
+                <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+                <span>CRM</span>
+                {crmCount > 0 && (
+                  <span
+                    className={`px-1 py-0.2 text-[9px] font-bold font-mono ${
+                      currentView === 'crm' ? 'bg-[#0B2545] text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {crmCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* 3. Partner Commissions */}
-            <button
-              type="button"
-              onClick={() => onNavigate('commission')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 transition-all ${
-                currentView === 'commission'
-                  ? 'bg-white text-[#0B2545] shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-              }`}
-              title="Partner Referral Commission Tracker"
-            >
-              <DollarSign className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Commissions</span>
-            </button>
+            {canSeeLce && (
+              <button
+                type="button"
+                onClick={() => onNavigate('commission')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 transition-all ${
+                  currentView === 'commission'
+                    ? 'bg-white text-[#0B2545] shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+                title="Partner Referral Commission Tracker"
+              >
+                <DollarSign className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Commissions</span>
+              </button>
+            )}
 
             {/* 4. Templates */}
-            <button
-              type="button"
-              onClick={() => onNavigate('templates')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 transition-all ${
-                currentView === 'templates'
-                  ? 'bg-white text-[#0B2545] shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-              }`}
-              title="Service Master Scope Templates"
-            >
-              <Layers className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline">Templates</span>
-            </button>
+            {canSeeTemplates && (
+              <button
+                type="button"
+                onClick={() => onNavigate('templates')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 transition-all ${
+                  currentView === 'templates'
+                    ? 'bg-white text-[#0B2545] shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+                title="Service Master Scope Templates"
+              >
+                <Layers className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden lg:inline">Templates</span>
+              </button>
+            )}
           </nav>
 
           {/* Spotlight Search Shortcut Button */}
@@ -245,100 +253,106 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="font-semibold">Live Synced</span>
           </div>
 
-          {/* Primary CTA: New Engagement */}
-          <button
-            type="button"
-            onClick={onNewEngagement}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0B2545] hover:bg-[#133863] text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap"
-            title="Create New Charter Engagement"
-          >
-            <Plus className="w-3.5 h-3.5 text-white shrink-0" />
-            <span className="hidden md:inline">New</span> Engagement
-          </button>
-
-          {/* Secondary Tools & Settings Dropdown */}
-          <div className="relative" ref={toolsRef}>
+          {/* Primary CTA: New Engagement (Only if authorized) */}
+          {canCreateEngagement && (
             <button
               type="button"
-              onClick={() => setIsToolsOpen((prev) => !prev)}
-              className={`p-1.5 border transition-colors flex items-center gap-1 text-xs font-semibold ${
-                isToolsOpen
-                  ? 'bg-slate-200 border-slate-300 text-slate-900'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-              }`}
-              title="System Tools: Lists, Dustbin, and Firm Settings"
+              onClick={onNewEngagement}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0B2545] hover:bg-[#133863] text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap"
+              title="Create New Charter Engagement"
             >
-              <Settings className="w-3.5 h-3.5 text-slate-600" />
-              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isToolsOpen ? 'rotate-180' : ''}`} />
+              <Plus className="w-3.5 h-3.5 text-white shrink-0" />
+              <span className="hidden md:inline">New</span> Engagement
             </button>
+          )}
 
-            {isToolsOpen && (
-              <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Firm & System Tools
-                </div>
+          {/* Secondary Tools & Settings Dropdown */}
+          {hasAnyTools && (
+            <div className="relative" ref={toolsRef}>
+              <button
+                type="button"
+                onClick={() => setIsToolsOpen((prev) => !prev)}
+                className={`p-1.5 border transition-colors flex items-center gap-1 text-xs font-semibold ${
+                  isToolsOpen
+                    ? 'bg-slate-200 border-slate-300 text-slate-900'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                }`}
+                title="System Tools: Lists, Dustbin, and Firm Settings"
+              >
+                <Settings className="w-3.5 h-3.5 text-slate-600" />
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isToolsOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-                {/* Firm & Letterhead Settings */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsToolsOpen(false);
-                    onOpenSettings();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
-                >
-                  <Settings className="w-3.5 h-3.5 text-slate-500" />
-                  <div className="flex-1">
-                    <div className="font-semibold">Firm Settings</div>
-                    <div className="text-[10px] text-slate-400">Letterhead, logo, tax & banking</div>
+              {isToolsOpen && (
+                <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Firm & System Tools
                   </div>
-                </button>
 
-                {/* Custom Lists & Taxonomies */}
-                {onOpenTaxonomy && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsToolsOpen(false);
-                      onOpenTaxonomy();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
-                  >
-                    <Sliders className="w-3.5 h-3.5 text-slate-500" />
-                    <div className="flex-1">
-                      <div className="font-semibold">Custom Taxonomies</div>
-                      <div className="text-[10px] text-slate-400">Lead stages, statuses & categories</div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Dustbin / Recycle Bin */}
-                {onOpenTrash && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsToolsOpen(false);
-                      onOpenTrash();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-slate-500" />
-                    <div className="flex-1 flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold">Recycle Dustbin</div>
-                        <div className="text-[10px] text-slate-400">Restore deleted records</div>
+                  {/* Firm & Letterhead Settings */}
+                  {canSeeFirmSettings && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsToolsOpen(false);
+                        onOpenSettings();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-slate-500" />
+                      <div className="flex-1">
+                        <div className="font-semibold">Firm Settings</div>
+                        <div className="text-[10px] text-slate-400">Letterhead, logo, tax & banking</div>
                       </div>
-                      {trashCount > 0 && (
-                        <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-600 border border-slate-200">
-                          {trashCount}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                    </button>
+                  )}
+
+                  {/* Custom Lists & Taxonomies */}
+                  {canSeeTaxonomies && onOpenTaxonomy && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsToolsOpen(false);
+                        onOpenTaxonomy();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                      <div className="flex-1">
+                        <div className="font-semibold">Custom Taxonomies</div>
+                        <div className="text-[10px] text-slate-400">Lead stages, statuses & categories</div>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Dustbin / Recycle Bin */}
+                  {canSeeTrash && onOpenTrash && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsToolsOpen(false);
+                        onOpenTrash();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+                      <div className="flex-1 flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">Recycle Dustbin</div>
+                          <div className="text-[10px] text-slate-400">Restore deleted records</div>
+                        </div>
+                        {trashCount > 0 && (
+                          <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-600 border border-slate-200">
+                            {trashCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* User Account & Role Profile Menu */}
           <div className="relative" ref={userMenuRef}>
@@ -356,10 +370,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <img
                   src={currentUser.photoUrl}
                   alt={userDisplayName}
-                  className="w-6 h-6 object-cover border border-slate-300 shrink-0"
+                  className="w-6 h-6 rounded-full object-cover border border-slate-300 shrink-0"
                 />
               ) : (
-                <div className="w-6 h-6 bg-[#0B2545] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                <div className="w-6 h-6 rounded-full bg-[#0B2545] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                   {initials}
                 </div>
               )}
@@ -389,10 +403,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <img
                         src={currentUser.photoUrl}
                         alt={userDisplayName}
-                        className="w-10 h-10 object-cover border border-slate-300 shrink-0"
+                        className="w-10 h-10 rounded-full object-cover border border-slate-300 shrink-0"
                       />
                     ) : (
-                      <div className="w-10 h-10 bg-[#0B2545] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-[#0B2545] text-white flex items-center justify-center font-bold text-sm shrink-0">
                         {initials}
                       </div>
                     )}
@@ -423,30 +437,54 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 </div>
 
-                {/* Admin Management Dashboard Link (Strictly available or prominent for Admin) */}
+                {/* Change Credentials / Profile Photo Link */}
                 <div className="py-1 border-b border-slate-100">
                   <button
                     type="button"
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      onOpenAdminUserManagement();
+                      onOpenChangeCredentials?.();
                     }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors"
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors cursor-pointer"
                   >
-                    <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <KeyRound className="w-4 h-4 text-amber-500 shrink-0" />
                     <div className="flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span>Admin User Management</span>
-                        <span className="px-1 py-0.2 text-[8.5px] font-bold bg-amber-100 text-amber-900 uppercase">
-                          Admin
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <span>Change User ID, Password & Photo</span>
                       </div>
                       <div className="text-[10px] text-slate-400 font-normal">
-                        Create accounts, customize job titles, assign roles
+                        Update your login credentials and round photo
                       </div>
                     </div>
                   </button>
                 </div>
+
+                {/* Admin Management Dashboard Link (Strictly available ONLY for authorized Admin) */}
+                {canManageUsers && (
+                  <div className="py-1 border-b border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onOpenAdminUserManagement();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 hover:text-[#0B2545] text-left transition-colors cursor-pointer"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span>Admin User Management & Audit</span>
+                          <span className="px-1 py-0.2 text-[8.5px] font-bold bg-amber-100 text-amber-900 uppercase">
+                            Admin
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-normal">
+                          Permissions, restrictions & login logs
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                )}
 
                 {/* Role Preview Simulator: Test column-level access control live! */}
                 {onSimulateRoleChange && (

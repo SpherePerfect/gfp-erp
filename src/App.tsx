@@ -11,6 +11,8 @@ import { SpotlightSearchModal } from './components/SpotlightSearchModal';
 import { TrashModal } from './components/TrashModal';
 import { CustomTaxonomyModal } from './components/CustomTaxonomyModal';
 import { AdminUserManagementModal } from './components/AdminUserManagementModal';
+import { LoginScreen } from './components/LoginScreen';
+import { ChangeCredentialsModal } from './components/ChangeCredentialsModal';
 import {
   EngagementRecord,
   EngagementStatus,
@@ -30,6 +32,14 @@ import {
   PRIMARY_ADMIN_EMAIL,
 } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import {
+  getActiveSessionUser,
+  setActiveUserUid,
+  logoutCurrentUser,
+  DEFAULT_INITIAL_USER,
+} from './utils/authService';
+import { logAuthEvent } from './utils/authLogService';
+import { canSee, isRestricted } from './utils/permissions';
 import {
   subscribeToUsers,
   subscribeToEngagements,
@@ -112,8 +122,14 @@ export default function App() {
 
   // RBAC & Authentication State
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(() => auth.currentUser);
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(DEFAULT_PRIMARY_ADMIN);
-  const [allUsers, setAllUsers] = useState<AppUser[]>([DEFAULT_PRIMARY_ADMIN]);
+  const [allUsers, setAllUsers] = useState<AppUser[]>([DEFAULT_INITIAL_USER, DEFAULT_PRIMARY_ADMIN]);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    return getActiveSessionUser([DEFAULT_INITIAL_USER, DEFAULT_PRIMARY_ADMIN]);
+  });
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return !!getActiveSessionUser([DEFAULT_INITIAL_USER, DEFAULT_PRIMARY_ADMIN]);
+  });
+  const [isChangeCredentialsOpen, setIsChangeCredentialsOpen] = useState(false);
   const [simulatedRole, setSimulatedRole] = useState<UserRole | undefined>(undefined);
   const [isAdminUserModalOpen, setIsAdminUserModalOpen] = useState(false);
 
@@ -146,13 +162,20 @@ export default function App() {
 
     const unsubUsers = subscribeToUsers((users) => {
       if (Array.isArray(users)) {
-        setAllUsers(users);
+        const has123 = users.some((u) => u.loginId === '123' || u.uid === DEFAULT_INITIAL_USER.uid);
+        const combined = has123 ? users : [DEFAULT_INITIAL_USER, ...users];
+        setAllUsers(combined);
+        if (!has123 && users.length === 0) {
+          saveUserDoc(DEFAULT_INITIAL_USER).catch((err) =>
+            console.warn('Initial 123 user could not be saved to Firestore:', err)
+          );
+        }
         if (currentUser) {
-          const matched = users.find((u) => u.uid === currentUser.uid);
+          const matched = combined.find((u) => u.uid === currentUser.uid || u.loginId === currentUser.loginId);
           if (matched) setCurrentUser(matched);
         }
       }
-    }, [DEFAULT_PRIMARY_ADMIN]);
+    }, [DEFAULT_INITIAL_USER, DEFAULT_PRIMARY_ADMIN]);
 
     const unsubEng = subscribeToEngagements((engs) => {
       if (Array.isArray(engs)) {
@@ -202,17 +225,20 @@ export default function App() {
         );
         if (existing) {
           setCurrentUser(existing);
+          setActiveUserUid(existing.uid);
+          setIsLoggedIn(true);
         } else {
           // If first user or matches PRIMARY_ADMIN_EMAIL, make Admin
           const isFirst =
             allUsers.length === 0 ||
-            allUsers.every((u) => u.uid === 'admin-yogesh-01') ||
+            allUsers.every((u) => u.uid === 'admin-yogesh-01' || u.uid === DEFAULT_INITIAL_USER.uid) ||
             (fbUser.email &&
               fbUser.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase());
 
           const newUser: AppUser = {
             uid: fbUser.uid,
             email: fbUser.email || '',
+            loginId: fbUser.email ? fbUser.email.split('@')[0] : 'user',
             displayName: fbUser.displayName || 'Authorized Team Member',
             photoUrl: fbUser.photoURL || undefined,
             jobTitle: isFirst ? 'Managing Partner & Practice Head' : 'Associate Consultant',
@@ -221,20 +247,47 @@ export default function App() {
             status: 'Active',
             createdAt: new Date().toISOString(),
             isFirstAdmin: isFirst,
+            restrictedItems: [],
           };
           await saveUserDoc(newUser);
           setCurrentUser(newUser);
-        }
-      } else {
-        // Retain default primary admin profile when unauthenticated in preview
-        if (!currentUser) {
-          setCurrentUser(DEFAULT_PRIMARY_ADMIN);
+          setActiveUserUid(newUser.uid);
+          setIsLoggedIn(true);
         }
       }
     });
 
     return () => unsubAuth();
   }, [allUsers]);
+
+  // Enforce module restrictions if active user has restrictions
+  useEffect(() => {
+    if (!currentUser) return;
+    if (view === 'crm' && !canSee(currentUser, 'module_crm', effectiveRole)) {
+      setView('dashboard');
+      dispatchToast({
+        title: 'Access Restricted',
+        message: 'Marketing CRM module is restricted for your account by the Administrator.',
+        type: 'warning',
+      });
+    }
+    if (view === 'commission' && !canSee(currentUser, 'module_lce', effectiveRole)) {
+      setView('dashboard');
+      dispatchToast({
+        title: 'Access Restricted',
+        message: 'LCE Commission Tracker module is restricted for your account by the Administrator.',
+        type: 'warning',
+      });
+    }
+    if (view === 'templates' && !canSee(currentUser, 'module_templates', effectiveRole)) {
+      setView('dashboard');
+      dispatchToast({
+        title: 'Access Restricted',
+        message: 'Master Templates library is restricted for your account by the Administrator.',
+        type: 'warning',
+      });
+    }
+  }, [view, currentUser, effectiveRole]);
 
   // Global Command+K or Ctrl+K shortcut to toggle Apple Spotlight modal
   useEffect(() => {
@@ -250,6 +303,35 @@ export default function App() {
   }, []);
 
   // Auth Action Handlers
+  const handleLoginSuccess = async (user: AppUser) => {
+    setCurrentUser(user);
+    setActiveUserUid(user.uid);
+    setIsLoggedIn(true);
+
+    // Audit Log for Login
+    await logAuthEvent({
+      userId: user.loginId || user.email || user.uid,
+      userName: user.displayName,
+      role: user.role,
+      action: 'LOG_IN',
+      details: `User signed in successfully with User ID "${user.loginId || user.email}".`,
+    });
+
+    if (user.loginId === '123' && user.password === '123') {
+      dispatchToast({
+        title: 'Initial Login Successful',
+        message: 'Welcome! You can change your User ID, password, and upload your round photo by clicking your avatar in the top navbar.',
+        type: 'info',
+      });
+    } else {
+      dispatchToast({
+        title: 'Authenticated Successfully',
+        message: `Welcome back, ${user.displayName}.`,
+        type: 'success',
+      });
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     try {
       const user = await signInWithGoogle();
@@ -264,7 +346,7 @@ export default function App() {
       console.error('Google sign-in error:', err);
       dispatchToast({
         title: 'Sign In Information',
-        message: err.message || 'Popups may be blocked in iframe preview. Using Admin session.',
+        message: err.message || 'Popups may be blocked in iframe preview. Using User session.',
         type: 'info',
       });
     }
@@ -272,15 +354,28 @@ export default function App() {
 
   const handleSignOut = async () => {
     try {
+      if (currentUser) {
+        await logAuthEvent({
+          userId: currentUser.loginId || currentUser.email || currentUser.uid,
+          userName: currentUser.displayName,
+          role: currentUser.role,
+          action: 'LOG_OUT',
+          details: 'User explicitly logged out from session.',
+        });
+      }
+      logoutCurrentUser();
       await logOutUser();
-      setCurrentUser(DEFAULT_PRIMARY_ADMIN);
-      dispatchToast({
-        title: 'Signed Out',
-        message: 'Reverted to primary administrator profile.',
-        type: 'info',
-      });
     } catch (err: any) {
       console.error('Sign out error:', err);
+    } finally {
+      setCurrentUser(null);
+      setIsLoggedIn(false);
+      setSimulatedRole(undefined);
+      dispatchToast({
+        title: 'Signed Out Successfully',
+        message: 'You have been signed out. Please enter your credentials to log in again.',
+        type: 'info',
+      });
     }
   };
 
@@ -680,6 +775,19 @@ export default function App() {
     handleSaveEngagementsList(updated);
   };
 
+  if (!isLoggedIn || !currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+        <LoginScreen
+          onLoginSuccess={handleLoginSuccess}
+          allUsers={allUsers}
+          onOpenAdminSetup={() => setIsAdminUserModalOpen(true)}
+        />
+        <NotificationToast />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-slate-900 flex flex-col font-sans w-full max-w-full overflow-x-hidden">
       {/* Navigation */}
@@ -694,6 +802,7 @@ export default function App() {
         onSignInWithGoogle={handleGoogleSignIn}
         onSignOut={handleSignOut}
         onOpenAdminUserManagement={() => setIsAdminUserModalOpen(true)}
+        onOpenChangeCredentials={() => setIsChangeCredentialsOpen(true)}
         onToggleRoleSimulator={handleToggleRoleSimulator}
         isRoleSimulated={!!simulatedRole}
         onOpenSettings={() => {
@@ -740,6 +849,7 @@ export default function App() {
               globalSearchQuery={globalSearch}
               onGlobalSearchChange={setGlobalSearch}
               userRole={effectiveRole}
+              currentUser={currentUser}
             />
           </div>
         )}
@@ -761,6 +871,7 @@ export default function App() {
               onOpenTrash={() => setIsTrashOpen(true)}
               trashCount={trashCount}
               userRole={effectiveRole}
+              currentUser={currentUser}
             />
           </div>
         )}
@@ -955,6 +1066,14 @@ export default function App() {
         currentUserId={currentUser?.uid || ''}
         onSaveUser={handleSaveUser}
         onDeleteUser={handleDeleteUser}
+      />
+
+      {/* Change Credentials & Profile Photo Modal */}
+      <ChangeCredentialsModal
+        isOpen={isChangeCredentialsOpen}
+        onClose={() => setIsChangeCredentialsOpen(false)}
+        currentUser={currentUser}
+        onSaveUser={handleSaveUser}
       />
 
       {/* Global Apple-style Spring Animated Notification Toasts */}

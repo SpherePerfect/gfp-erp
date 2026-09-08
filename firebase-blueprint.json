@@ -17,9 +17,15 @@
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" },
         "lastLoginAt": { "type": "string" },
-        "isFirstAdmin": { "type": "boolean" }
+        "isFirstAdmin": { "type": "boolean" },
+        "loginId": { "type": "string" },
+        "password": { "type": "string" },
+        "restrictedItems": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
-      "required": ["uid", "email", "displayName", "role", "status", "createdAt"]
+      "required": ["uid", "displayName", "role", "status", "createdAt"]
     },
     "admin": {
       "title": "Admin Role Marker",
